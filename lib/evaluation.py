@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, balanced_accuracy_score
 
 def get_binary_classification_performance(y_hat, y_true):
   acc = accuracy_score(y_true, y_hat)
@@ -7,6 +7,12 @@ def get_binary_classification_performance(y_hat, y_true):
   f1_class_1 = f1_score(y_true, y_hat, pos_label=1)
   
   return acc, f1_class_0, f1_class_1
+
+def get_multiclass_classification_performance(y_hat, y_true):
+  acc = accuracy_score(y_true, y_hat)
+  balanced_acc = balanced_accuracy_score(y_true, y_hat)
+
+  return acc, balanced_acc
 
 def get_coverage_and_efficiency(confidence_intervals, y_true):  
   coverage = np.sum([1 if (y_true[i] in confidence_intervals[i]) else 0 

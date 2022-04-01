@@ -14,7 +14,7 @@ def plot(title, x, y, x_label="", y_label="", save_file=False):
     plt.savefig(title + ".png")
   plt.show()
 
-def describe_graph(data):
+def describe_graph(data, log_scale = False):
   graph = to_networkx(data)
 
   is_strongly_connected = nx.is_strongly_connected(graph)
@@ -29,5 +29,8 @@ def describe_graph(data):
   plt.plot(range(0,len(degree_histogram)), degree_histogram)
   plt.xlabel("Node degree")
   plt.ylabel("Num of nodes")
+  if log_scale:
+    plt.xscale("log")
+    plt.yscale("log")
   plt.title("Degree distribution")
   plt.show()
