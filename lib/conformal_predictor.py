@@ -20,10 +20,11 @@ class ConformalClassifier():
 
     return
   
-  def predict(self, y_hat, confidence_level, mondrian_category=None):
+  def predict(self, alphas, confidence_level, mondrian_category=None):
     """
-    Retrieve a prediction region for y_hat
-    confidence_level: e.g. 0.99
+    Retrieve a prediction region for the provided nonconformity measures 
+    \nOBS! Only single samples allowed
+    \nconfidence_level: e.g. 0.99
     """
 
     significance_level = 1 - confidence_level
@@ -33,7 +34,7 @@ class ConformalClassifier():
     classes = torch.unique(self.y)
 
     for y in classes:
-      ai = get_nonconformity_measure_for_classification(y_hat.detach(), y)
+      ai = alphas[y]
 
       # non-conformity scores
       if self.mondrian:
@@ -56,10 +57,19 @@ class ConformalClassifier():
       
     return prediction_region
 
-def get_nonconformity_measure_for_classification(y_proba: torch.Tensor, y_true: int):
-  """non-conformity measure according to "Reliable diagnosis of acute abdominal pain with conformal prediction" (cp_in_medicine)"""
-  y_probas_for_false_classes = torch.cat([y_proba[0:y_true], y_proba[y_true+1:]])
-  max_prob_not_y = torch.max(y_probas_for_false_classes)
-  alpha = max_prob_not_y - y_proba[y_true].item()
+def get_nonconformity_measure_for_classification(y_proba: torch.Tensor, version="v1"):
+  """Returns nonconformity measure for all possible classes"""
+  alphas = []
+  for i in range(y_proba.shape[0]):
+    if version == "v1": # non-conformity measure according to "Reliable diagnosis of acute abdominal pain with conformal prediction" (cp_in_medicine)
+      y_probas_for_false_classes = torch.cat([y_proba[0:i], y_proba[i+1:]])
+      max_prob_not_y = torch.max(y_probas_for_false_classes)
+      a = max_prob_not_y - y_proba[i].item()
+    elif version == "v2":
+      a = 1 - y_proba[i].item()
+    else:
+      raise ValueError("Invalid version")
+    
+    alphas.append(a)
 
-  return alpha
+  return torch.tensor(alphas)
