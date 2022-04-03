@@ -5,7 +5,7 @@ class ConformalClassifier():
   Inductive conformal prediction based on "Tutorial On Conformal Prediction" by Shafer & Vovk (p. 388).
   Extended with Mondrian Conformal Prediction option based on "Mondrian Conformal Regressors" by Boström & Johansson, and https://gist.github.com/dsleo/2880882b5e1c1feab677c4cf421e806d
   """
-  def __init__(self, alphas, y, mondrian=False, mondrian_taxonomy=None):
+  def __init__(self, alphas, y, mondrian=False, mondrian_taxonomy=None, cumulative_taxonomy=False):
     """
     alphas: non-conformity measures (n_samples).
     y: targets (n_samples)
@@ -17,6 +17,7 @@ class ConformalClassifier():
     self.y = y
     self.mondrian = mondrian
     self.mondrian_taxonomy = mondrian_taxonomy 
+    self.cumulative_taxonomy = cumulative_taxonomy
 
     return
   
@@ -41,7 +42,10 @@ class ConformalClassifier():
         if mondrian_category is not None:
           if self.mondrian_taxonomy is None:
             raise ValueError("Expected self.mondrian_taxonomy, but found None")
-          a = self.alphas[torch.logical_and(self.mondrian_taxonomy == mondrian_category, self.y == y)]
+          if self.cumulative_taxonomy:
+            a = self.alphas[torch.logical_and(self.mondrian_taxonomy <= mondrian_category, self.y == y)]
+          else:
+            a = self.alphas[torch.logical_and(self.mondrian_taxonomy == mondrian_category, self.y == y)]
         else:
           a = self.alphas[self.y == y]
       else:
