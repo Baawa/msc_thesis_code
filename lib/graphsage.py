@@ -67,6 +67,8 @@ class GraphSAGE(torch.nn.Module):
     return loss.item()
   
   def predict(self, data):
+    self.eval()
+    
     loader = NeighborLoader(data, num_neighbors=self.sampling_size, batch_size=data.x.shape[0])
 
     y_hat = []
