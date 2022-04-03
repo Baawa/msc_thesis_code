@@ -42,13 +42,16 @@ class ConformalClassifier():
         if mondrian_category is not None:
           if self.mondrian_taxonomy is None:
             raise ValueError("Expected self.mondrian_taxonomy, but found None")
+          
           if self.cumulative_taxonomy:
             a = self.alphas[torch.logical_and(self.mondrian_taxonomy <= mondrian_category, self.y == y)]
           else:
             a = self.alphas[torch.logical_and(self.mondrian_taxonomy == mondrian_category, self.y == y)]
-        else:
+        
+        else: # class-based mondrian
           a = self.alphas[self.y == y]
-      else:
+      
+      else: # not mondrian
         a = self.alphas
       
       # calculate p-score
