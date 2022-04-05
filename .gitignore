@@ -1,6 +1,7 @@
 # Albin config
 experiments/*/dataset
 */.DS_Store
+*/*/.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
