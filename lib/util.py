@@ -14,7 +14,7 @@ def plot(title, x, y, x_label="", y_label="", save_file=False):
     plt.savefig(title + ".png")
   plt.show()
 
-def describe_graph(data, log_scale = False, calc_diameter=False):
+def describe_graph(data, log_scale = False, calc_diameter=False, save_fig=False):
   graph = to_networkx(data)
 
   is_strongly_connected = nx.is_strongly_connected(graph)
@@ -33,4 +33,6 @@ def describe_graph(data, log_scale = False, calc_diameter=False):
     plt.xscale("log")
     plt.yscale("log")
   plt.title("Degree distribution")
+  if save_fig:
+    plt.savefig("degree_distribution.png")
   plt.show()
