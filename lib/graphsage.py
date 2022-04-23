@@ -146,4 +146,4 @@ class GraphSAGE(torch.nn.Module):
     
     out = self(data.x, data.edge_index)
     
-    return torch.tensor(out.detach())
+    return out.clone().detach()

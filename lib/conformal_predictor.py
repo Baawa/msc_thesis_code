@@ -25,14 +25,14 @@ class InductiveConformalClassifier():
     Inductive conformal prediction based on "Tutorial On Conformal Prediction" by Shafer & Vovk (p. 388).
     """
 
-    def __init__(self, alphas):
+    def __init__(self, alphas, num_classes):
         """
         alphas: non-conformity measures (n_samples).
-        y: targets (n_samples)
         """
         super()
 
         self.alphas = alphas
+        self.num_classes = num_classes
 
         return
 
@@ -47,9 +47,7 @@ class InductiveConformalClassifier():
 
         prediction_region = []
 
-        classes = torch.unique(self.y)
-
-        for y in classes:
+        for y in range(self.num_classes):
             ai = alphas[y]
 
             # non-conformity scores
@@ -82,7 +80,7 @@ class MondrianConformalClassifier():
 
         return
 
-    def predict(self, alphas, confidence_level):
+    def predict(self, alphas, max_y_proba, confidence_level):
         """
         Retrieve a prediction region for the provided nonconformity measures 
         \nOBS! Only single samples allowed
@@ -95,8 +93,7 @@ class MondrianConformalClassifier():
 
         classes = torch.unique(self.y)
 
-        max_y = alphas.argmax(dim=-1, keepdim=True)
-        _alphas = self.alphas[self.y == max_y]
+        _alphas = self.alphas[self.y == max_y_proba]
 
         for y in classes:
             ai = alphas[y]
