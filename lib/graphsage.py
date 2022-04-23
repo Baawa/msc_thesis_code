@@ -125,14 +125,14 @@ class GraphSAGE(torch.nn.Module):
 
     return node_class
 
-  def train_model(self, data, optimizer, loss_fn, batch_size):
+  def train_model(self, data, optimizer, loss_fn):
     self.train()
 
     optimizer.zero_grad()
     
     out = self(data.x, data.edge_index)
 
-    y_true = data.y.reshape(-1)
+    y_true = data.y.reshape(-1).detach()
 
     loss = loss_fn(out, y_true)
 
@@ -146,4 +146,4 @@ class GraphSAGE(torch.nn.Module):
     
     out = self(data.x, data.edge_index)
     
-    return torch.tensor(out)
+    return torch.tensor(out.detach())

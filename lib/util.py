@@ -11,7 +11,28 @@ def plot(title, x, y, x_label="", y_label="", save_file=False):
   plt.ylabel(y_label)
   plt.plot(x, y, "+-")
   if save_file:
-    plt.savefig(title + ".png")
+    plt.savefig("plots/" + title + ".png")
+  plt.show()
+
+def plot_multilines(title, x, y, labels, x_label="", y_label="", save_file=False):
+  """
+  x: x-values (n_values)
+  y: y-values (n_categories, n_values)
+  """
+  line_colors = ["b", "r", "g", "c", "m", "y"]
+  
+  plt.title(title)
+  plt.xlabel(x_label)
+  plt.ylabel(y_label)
+  
+  for i, yi in enumerate(y):
+    plt.plot(x, yi, "{}+-".format(line_colors[i]), label=labels[i])
+  
+  plt.legend()
+  
+  if save_file:
+    plt.savefig("plots/" + title + ".png")
+  
   plt.show()
 
 def describe_graph(data, log_scale = False, calc_diameter=False, save_fig=False):
@@ -34,5 +55,5 @@ def describe_graph(data, log_scale = False, calc_diameter=False, save_fig=False)
     plt.yscale("log")
   plt.title("Degree distribution")
   if save_fig:
-    plt.savefig("degree_distribution.png")
+    plt.savefig("plots/" + "degree_distribution.png")
   plt.show()
