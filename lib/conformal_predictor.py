@@ -25,7 +25,7 @@ class InductiveConformalClassifier():
     Inductive conformal prediction based on "Tutorial On Conformal Prediction" by Shafer & Vovk (p. 388).
     """
 
-    def __init__(self, alphas, y):
+    def __init__(self, alphas):
         """
         alphas: non-conformity measures (n_samples).
         y: targets (n_samples)
@@ -33,7 +33,6 @@ class InductiveConformalClassifier():
         super()
 
         self.alphas = alphas
-        self.y = y
 
         return
 
@@ -96,7 +95,8 @@ class MondrianConformalClassifier():
 
         classes = torch.unique(self.y)
 
-        _alphas = self.alphas[self.y == y]
+        max_y = alphas.argmax(dim=-1, keepdim=True)
+        _alphas = self.alphas[self.y == max_y]
 
         for y in classes:
             ai = alphas[y]
