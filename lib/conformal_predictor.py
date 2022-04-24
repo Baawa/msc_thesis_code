@@ -217,6 +217,68 @@ class NodeDegreeWeightedConformalClassifier():
       
     return prediction_region
 
+class EmbeddingDistanceWeightedConformalClassifier():
+  """
+  Inspired by "Conformal prediction beyond exchangeability" (2022)
+  """
+  def __init__(self, alphas, y, node_embeddings):
+    """
+    alphas: non-conformity measures (n_samples).
+    y: targets (n_samples)
+    node_embeddings: the samples node_embeddings (n_samples, embedding_size)
+    """
+    super()
+
+    self.alphas = alphas
+    self.y = y
+    self.node_embeddings = node_embeddings
+
+    return
+  
+  def predict(self, alphas, node_embedding, confidence_level):
+    """
+    Retrieve a prediction region for the provided nonconformity measures 
+    \nOBS! Only single samples allowed
+    \nconfidence_level: e.g. 0.99
+    """
+
+    significance_level = 1 - confidence_level
+
+    prediction_region = []
+
+    classes = torch.unique(self.y)
+    
+    # weights
+    # node_embedding_2d = torch.reshape(node_embedding, (1, node_embedding.shape[0]))
+    # embedding_distance = torch.cdist(self.node_embeddings, node_embedding_2d)
+
+    # euclidean ditance without sqrt for faster calculations
+    embedding_distance = torch.sum((self.node_embeddings-node_embedding)**2, dim=1)
+
+    max_distance = torch.max(embedding_distance)
+    normalized_distance = embedding_distance / max_distance
+    
+    weights = 1 - normalized_distance
+    sum_weights = torch.sum(weights) + 1
+    cal_normalized_weights = weights / sum_weights
+    sample_normalized_weight = 1 / sum_weights
+
+    for y in classes:
+      ai = alphas[y] * sample_normalized_weight
+
+      # non-conformity scores
+      a = self.alphas * cal_normalized_weights
+      
+      # calculate p-score
+      c = torch.count_nonzero(a >= ai)
+      p_score = c / len(a)
+
+      if p_score > significance_level:
+        prediction_region.append(y)
+    # END: for
+      
+    return prediction_region
+
 class LegacyConformalClassifier():
     """
     Inductive conformal prediction based on "Tutorial On Conformal Prediction" by Shafer & Vovk (p. 388).
