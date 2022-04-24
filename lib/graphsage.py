@@ -30,6 +30,8 @@ class GraphSAGEWithSampling(torch.nn.Module):
 
     self.sampling_size = sampling_size
 
+    self.return_embeds = False
+
   def reset_parameters(self):
     for conv in self.convs:
         conv.reset_parameters()
@@ -43,6 +45,9 @@ class GraphSAGEWithSampling(torch.nn.Module):
     # output layer
     embedding = self.convs[-1](x=embedding, edge_index=adj_t)
 
+    if self.return_embeds:
+      return embedding
+    
     node_class = self.softmax(embedding)
 
     return node_class
@@ -77,6 +82,9 @@ class GraphSAGEWithSampling(torch.nn.Module):
       y_hat.extend(out.tolist())
     
     return torch.tensor(y_hat)
+  
+  def set_return_embeds(self, return_embeds: bool):
+    self.return_embeds = return_embeds
 
 class GraphSAGE(torch.nn.Module):
   def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
@@ -106,6 +114,8 @@ class GraphSAGE(torch.nn.Module):
 
     self.dropout = 0.1
 
+    self.return_embeds = False
+
   def reset_parameters(self):
     for conv in self.convs:
         conv.reset_parameters()
@@ -120,6 +130,9 @@ class GraphSAGE(torch.nn.Module):
     
     # output layer
     embedding = self.convs[-1](x=embedding, edge_index=adj_t)
+
+    if self.return_embeds:
+      return embedding
 
     node_class = self.softmax(embedding)
 
@@ -147,3 +160,6 @@ class GraphSAGE(torch.nn.Module):
     out = self(data.x, data.edge_index)
     
     return out.clone().detach()
+
+  def set_return_embeds(self, return_embeds: bool):
+    self.return_embeds = return_embeds
