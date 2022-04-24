@@ -12,9 +12,9 @@ def get_binary_classification_performance(y_hat, y_true):
 
 def get_multiclass_classification_performance(y_hat, y_true):
     acc = accuracy_score(y_true, y_hat)
-    micro_f1_score = f1_score(y_true, y_hat, average="micro")
+    macro_f1_score = f1_score(y_true, y_hat, average="macro")
 
-    return acc, micro_f1_score
+    return acc, macro_f1_score
 
 
 def get_coverage_and_efficiency(confidence_intervals, y_true):
