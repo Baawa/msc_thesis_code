@@ -1,7 +1,7 @@
 
 import os
 import sys
-module_path = os.path.abspath(os.path.join('./'))
+module_path = os.path.abspath(os.path.join('../'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
@@ -14,13 +14,18 @@ from lib import evaluation
 from lib.graphsage import GraphSAGE
 from lib.data import split, split_dataset
 from lib.util import plot
+
+# special setting for plotting on ubuntu
+os.system('Xvfb :1 -screen 0 1600x1200x16  &')    # create virtual display with size 1600x1200 and 16 bit color. Color can be changed to 24 or 8
+os.environ['DISPLAY']=':1.0'    # tell X clients to use our virtual DISPLAY :1.0.
+
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 
 
 NUM_EXPERIMENTS = 100
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-NODE_YEARS = [1990, 1995, 2000, 2005, 2010, 2015, 2020]
+NODE_YEARS = [2000, 2005, 2010, 2015, 2020]
 CONFIDENCE_LEVEL = 0.95
 
 MODEL_ARGS = {
@@ -34,7 +39,6 @@ def split_graph(data):
   graphs = []
 
   for year in NODE_YEARS:
-    print("year: {}".format(year))
     indices = torch.nonzero(torch.where(data.node_year[:, 0] <= year, 1, 0))[
         :, 0].tolist()
 
@@ -53,10 +57,10 @@ def split_graph(data):
   return graphs
 
 
-def train_model(graph, num_classes):
+def train_model(graph, num_features, num_classes):
   train_data = graph["train_data"]
   data = graph["data"]
-  model = GraphSAGE(data.x.shape[1], MODEL_ARGS["hidden_dim"],
+  model = GraphSAGE(num_features, MODEL_ARGS["hidden_dim"],
                     num_classes, MODEL_ARGS["num_layers"]).to(DEVICE)
 
   # reset the parameters to initial random value
@@ -116,7 +120,6 @@ def run_train_once_no_resampling():
     graph["train_data"] = graph["train_data"].to(DEVICE)
     graph["data"] = graph["data"].to(DEVICE)
 
-
   accuracy_scores = []
   macro_f1_scores = []
 
@@ -130,7 +133,7 @@ def run_train_once_no_resampling():
 
     # train on first snapshot
     first_snapshot = graphs[0]
-    model = train_model(first_snapshot)
+    model = train_model(first_snapshot, data.num_features, dataset.num_classes)
 
     y_hat = model.predict(first_snapshot["data"])
     y_hat = y_hat[first_snapshot["test_indices"]]
@@ -178,8 +181,8 @@ def run_train_once_no_resampling():
     alphas = []
     for y_probas, yt in zip(y_hat,y_true):
       y = yt.item()
-      alphas = get_nonconformity_measure_for_classification(y_probas)
-      alphas.append(alphas[y])
+      a = get_nonconformity_measure_for_classification(y_probas)
+      alphas.append(a[y])
 
     alphas = torch.tensor(alphas)
 
@@ -200,7 +203,7 @@ def run_train_once_no_resampling():
 
       confidence_intervals = get_confidence_intervals(icp, y_hat, CONFIDENCE_LEVEL)
 
-      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true)
+      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = evaluation.get_coverage_and_efficiency(confidence_intervals, y_true)
 
       _icp_coverages.append(coverage)
       _icp_avg_prediction_set_sizes.append(avg_prediction_set_size)
