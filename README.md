@@ -37,6 +37,7 @@ pip3 install ogb
 // might need to run `pip3 install torch==1.8.0` again, to override ogb's torch version
 
 pip3 install matplotlib
+sudo apt-get install -y xvfb
 
 pip3 install notebook
 
