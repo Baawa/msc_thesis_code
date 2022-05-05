@@ -28,6 +28,7 @@ NUM_EXPERIMENTS = 100
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 NODE_YEARS = [2000, 2005, 2010, 2015, 2020]
 CONFIDENCE_LEVEL = 0.95
+OUTPUT_FOLDER = "output/arxiv/run_train_once_no_resampling/"
 
 MODEL_ARGS = {
     "num_layers": 3,
@@ -96,7 +97,7 @@ def get_confidence_intervals_mcp(cp, y_hat, confidence_level=0.95):
   return confidence_intervals
 
 def save_results(file, str):
-  output_dir = "output/arxiv/"
+  output_dir = OUTPUT_FOLDER
   try:
     os.mkdir(output_dir)
   finally:
@@ -109,7 +110,7 @@ def plot_class_distribution(ext, y, num_classes):
   plt.hist(y, num_classes)
   plt.xlabel("Class")
   plt.ylabel("num of nodes")
-  plt.savefig("output/arxiv/class-dist-{}.png".format(ext))
+  plt.savefig(OUTPUT_FOLDER + "class-dist-{}.png".format(ext))
   plt.close()
 
 def create_icp(model, data, calibration_indices, num_classes):
@@ -172,8 +173,16 @@ def save_cp_performance(prefix, coverages, avg_prediction_set_sizes, frac_single
   scores = [coverage_avg, coverage_std, avg_prediction_set_size_avg, avg_prediction_set_size_std, frac_singleton_pred_avg, frac_singleton_pred_std, frac_empty_pred_avg, frac_empty_pred_std]
   save_results("{}_performance.txt".format(prefix), tabulate(scores, headers=NODE_YEARS))
 
+def plot(title, x_label, y_label, x, y):
+  plt.title(title)
+  plt.xlabel(x_label)
+  plt.ylabel(y_label)
+  plt.plot(x, y, "+-")
+  plt.savefig(OUTPUT_FOLDER + title + ".png")
+  plt.close()
+
 def run_train_once_no_resampling():
-  logger = Logger("output/arxiv")
+  logger = Logger(OUTPUT_FOLDER)
 
   logger.log("STARTED: run_train_once_no_resampling")
 
@@ -373,7 +382,8 @@ def run_train_once_no_resampling():
   save_times("graphsage_training", graphsage_training_times)
 
   # plot model performance
-  plot("arxiv-train_once_no_resampling-graphsage-perf", NODE_YEARS, np.mean(accuracy_scores, axis=1), "Timestep", "Accuracy")
+  logger.log("graphsage_performance: {}".format(np.mean(accuracy_scores, axis=1)))
+  plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=1))
 
   # print icp performance
   save_cp_performance("icp", icp_coverages, icp_avg_prediction_set_sizes, icp_frac_singleton_preds, icp_frac_empty_preds)
