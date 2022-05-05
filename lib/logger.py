@@ -3,9 +3,9 @@ from datetime import datetime
 
 class Logger:
   def __init__(self, output_dir):
-    self.output_file = output_dir + "/log.txt"
+    self.output_file = output_dir + "log.txt"
     try:
-      os.mkdir(output_dir)
+      os.makedirs(output_dir, exist_ok=True)
     except:
       print("output_dir exists")
 

@@ -24,7 +24,7 @@ from tabulate import tabulate
 import time
 
 
-NUM_EXPERIMENTS = 100
+NUM_EXPERIMENTS = 3
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 NODE_YEARS = [2000, 2005, 2010, 2015, 2020]
 CONFIDENCE_LEVEL = 0.95
@@ -99,7 +99,7 @@ def get_confidence_intervals_mcp(cp, y_hat, confidence_level=0.95):
 def save_results(file, str):
   output_dir = OUTPUT_FOLDER
   try:
-    os.mkdir(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
   finally:
     f = open(output_dir + file, "w")
     f.write(str)
@@ -128,7 +128,7 @@ def create_icp(model, data, calibration_indices, num_classes):
 
   alphas = torch.tensor(alphas)
 
-  icp = InductiveConformalClassifier(alphas, num_classes)
+  icp = InductiveConformalClassifier(alphas.cpu(), num_classes)
 
   return icp
 
@@ -148,27 +148,27 @@ def create_mcp(model, data, calibration_indices):
   alphas = torch.tensor(alphas)
   y = y_true
 
-  mcp = MondrianConformalClassifier(alphas, y)
+  mcp = MondrianConformalClassifier(alphas.cpu(), y.cpu())
 
   return mcp
 
 def save_times(prefix, times):
   time_avg = np.mean(times)
   time_std = np.std(times)
-  save_results("{}_time.txt".format(prefix), tabulate([time_avg, time_std], headers=["avg","std"]))
+  save_results("{}_time.txt".format(prefix), tabulate([[time_avg], [time_std]], headers=["avg","std"]))
 
 def save_cp_performance(prefix, coverages, avg_prediction_set_sizes, frac_singleton_preds, frac_empty_preds):
-  coverage_avg = ["coverage avg"].append(np.mean(coverages, axis=1))
-  coverage_std = ["coverage std"].append(np.std(coverages, axis=1))
+  coverage_avg = ["coverage avg"].append(np.mean(coverages, axis=0))
+  coverage_std = ["coverage std"].append(np.std(coverages, axis=0))
   
-  avg_prediction_set_size_avg = ["avg prediction set size avg"].append(np.mean(avg_prediction_set_sizes, axis=1))
-  avg_prediction_set_size_std = ["avg prediction set size std"].append(np.std(avg_prediction_set_sizes, axis=1))
+  avg_prediction_set_size_avg = ["avg prediction set size avg"].append(np.mean(avg_prediction_set_sizes, axis=0))
+  avg_prediction_set_size_std = ["avg prediction set size std"].append(np.std(avg_prediction_set_sizes, axis=0))
   
-  frac_singleton_pred_avg = ["frac singleton pred avg"].append(np.mean(frac_singleton_preds, axis=1))
-  frac_singleton_pred_std = ["frac singleton pred std"].append(np.std(frac_singleton_preds, axis=1))
+  frac_singleton_pred_avg = ["frac singleton pred avg"].append(np.mean(frac_singleton_preds, axis=0))
+  frac_singleton_pred_std = ["frac singleton pred std"].append(np.std(frac_singleton_preds, axis=0))
   
-  frac_empty_pred_avg = ["frac empty pred avg"].append(np.mean(frac_empty_preds, axis=1))
-  frac_empty_pred_std = ["frac empty pred std"].append(np.std(frac_empty_preds, axis=1))
+  frac_empty_pred_avg = ["frac empty pred avg"].append(np.mean(frac_empty_preds, axis=0))
+  frac_empty_pred_std = ["frac empty pred std"].append(np.std(frac_empty_preds, axis=0))
   
   scores = [coverage_avg, coverage_std, avg_prediction_set_size_avg, avg_prediction_set_size_std, frac_singleton_pred_avg, frac_singleton_pred_std, frac_empty_pred_avg, frac_empty_pred_std]
   save_results("{}_performance.txt".format(prefix), tabulate(scores, headers=NODE_YEARS))
@@ -273,6 +273,7 @@ def run_train_once_no_resampling():
     macro_f1_scores.append(_macro_f1_scores)
 
     # ICP
+    logger.log("running ICP")
     icp = create_icp(model, first_snapshot["data"], first_snapshot["calibration_indices"], dataset.num_classes)
 
     _icp_coverages = []
@@ -308,6 +309,8 @@ def run_train_once_no_resampling():
     icp_frac_empty_preds.append(_icp_frac_empty_preds)
     
     # ICP with resampling
+    logger.log("running ICP with resampling")
+    
     _icp_with_resampling_coverages = []
     _icp_with_resampling_avg_prediction_set_sizes = []
     _icp_with_resampling_frac_singleton_preds = []
@@ -343,6 +346,8 @@ def run_train_once_no_resampling():
     icp_with_resampling_frac_empty_preds.append(_icp_with_resampling_frac_empty_preds)
 
     # MCP
+    logger.log("running MCP")
+    
     mcp = create_mcp(model, first_snapshot["data"], first_snapshot["calibration_indices"])
 
     _mcp_coverages = []
@@ -382,8 +387,7 @@ def run_train_once_no_resampling():
   save_times("graphsage_training", graphsage_training_times)
 
   # plot model performance
-  logger.log("graphsage_performance: {}".format(np.mean(accuracy_scores, axis=1)))
-  plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=1))
+  plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0))
 
   # print icp performance
   save_cp_performance("icp", icp_coverages, icp_avg_prediction_set_sizes, icp_frac_singleton_preds, icp_frac_empty_preds)
