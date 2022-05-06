@@ -22,6 +22,8 @@ os.environ['DISPLAY']=':1.0'    # tell X clients to use our virtual DISPLAY :1.0
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import time
+from cp_evaluators import ICPEvaluator
+from graph import Graph
 
 
 NUM_EXPERIMENTS = 3
@@ -38,7 +40,7 @@ MODEL_ARGS = {
 }
 
 def split_graph(data):
-  graphs = []
+  graphs = [Graph]
 
   for year in NODE_YEARS:
     indices = torch.nonzero(torch.where(data.node_year[:, 0] <= year, 1, 0))[
@@ -48,20 +50,12 @@ def split_graph(data):
 
     train_data, calibration_indices, test_indices = split_dataset(
         year_data, test_frac=0.2, calibration_frac=0.2)
-    graphs.append({
-        "year": year,
-        "data": year_data,
-        "train_data": train_data,
-        "calibration_indices": calibration_indices,
-        "test_indices": test_indices,
-    })
+    graphs.append(Graph(year, year_data, train_data, calibration_indices, test_indices))
 
   return graphs
 
 
-def train_model(graph, num_features, num_classes):
-  train_data = graph["train_data"]
-  data = graph["data"]
+def train_model(graph: Graph, num_features, num_classes):
   model = GraphSAGE(num_features, MODEL_ARGS["hidden_dim"],
                     num_classes, MODEL_ARGS["num_layers"]).to(DEVICE)
 
@@ -73,18 +67,9 @@ def train_model(graph, num_features, num_classes):
   loss_fn = torch.nn.NLLLoss()
 
   for epoch in range(1, 1 + MODEL_ARGS["epochs"]):
-      loss = model.train_model(train_data, optimizer, loss_fn)
+      loss = model.train_model(graph.train_data, optimizer, loss_fn)
 
   return model
-
-def get_confidence_intervals_icp(cp, y_hat, confidence_level=0.95):
-  confidence_intervals = []
-  for yi in y_hat:
-    alphas = get_nonconformity_measure_for_classification(yi)
-    ci = cp.predict(alphas, confidence_level)
-    confidence_intervals.append(ci)
-  
-  return confidence_intervals
 
 def get_confidence_intervals_mcp(cp, y_hat, confidence_level=0.95):
   confidence_intervals = []
@@ -113,13 +98,7 @@ def plot_class_distribution(ext, y, num_classes):
   plt.savefig(OUTPUT_FOLDER + "class-dist-{}.png".format(ext))
   plt.close()
 
-def create_icp(model, data, calibration_indices, num_classes):
-  y_hat = model.predict(data)
-  y_hat = y_hat[calibration_indices]
-
-  y_true = data.y[calibration_indices]
-  y_true = y_true.reshape(-1).detach()
-
+def create_icp(y_hat, y_true, num_classes):
   alphas = []
   for y_probas, yt in zip(y_hat,y_true):
     y = yt.item()
@@ -195,27 +174,15 @@ def run_train_once_no_resampling():
 
   plot_class_distribution("full graph", data.y.reshape(-1).detach().numpy(), dataset.num_classes)
 
-  graphs = split_graph(data)
-
-  for graph in graphs:
-    plot_class_distribution(graph["year"], graph["data"].y.reshape(-1).detach().numpy(), dataset.num_classes)
 
   logger.log('Device: {}'.format(DEVICE))
-
-  for graph in graphs:
-    graph["train_data"] = graph["train_data"].to(DEVICE)
-    graph["data"] = graph["data"].to(DEVICE)
   
   graphsage_training_times = []
 
   accuracy_scores = []
   macro_f1_scores = []
 
-  icp_coverages = []
-  icp_avg_prediction_set_sizes = []
-  icp_frac_singleton_preds = []
-  icp_frac_empty_preds = []
-  icp_prediction_times = []
+  icp_evaluator = ICPEvaluator("arxiv_icp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
   
   icp_with_resampling_coverages = []
   icp_with_resampling_avg_prediction_set_sizes = []
@@ -232,6 +199,15 @@ def run_train_once_no_resampling():
   for experiment_num in range(NUM_EXPERIMENTS):
     logger.log("Experiment {} started".format(experiment_num))
 
+    # split graph
+    graphs = split_graph(data)
+
+    for graph in graphs:
+      plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes)
+    for graph in graphs:
+      graph.train_data = graph.train_data.to(DEVICE)
+      graph.data = graph.data.to(DEVICE)
+
     # train on first snapshot
     first_snapshot = graphs[0]
     start_time = time.time()
@@ -239,11 +215,11 @@ def run_train_once_no_resampling():
     graphsage_training_time = time.time() - start_time
     graphsage_training_times.append(graphsage_training_time)
 
-    y_hat = model.predict(first_snapshot["data"])
-    y_hat = y_hat[first_snapshot["test_indices"]]
+    y_hat = model.predict(first_snapshot.data)
+    y_hat = y_hat[first_snapshot.test_indices]
     y_hat = y_hat.argmax(dim=-1, keepdim=True).reshape(-1)
 
-    y_true = first_snapshot["data"].y[first_snapshot["test_indices"]
+    y_true = first_snapshot.data.y[first_snapshot.test_indices
                                       ].reshape(-1)
 
     acc, macro_f1 = evaluation.get_multiclass_classification_performance(
@@ -256,8 +232,8 @@ def run_train_once_no_resampling():
     _macro_f1_scores = []
 
     for graph in graphs:
-      graph_data = graph["data"]
-      test_indices = graph["test_indices"]
+      graph_data = graph.data
+      test_indices = graph.test_indices
 
       y_hat = model.predict(graph_data)
       y_hat = y_hat[test_indices]
@@ -274,39 +250,16 @@ def run_train_once_no_resampling():
 
     # ICP
     logger.log("running ICP")
-    icp = create_icp(model, first_snapshot["data"], first_snapshot["calibration_indices"], dataset.num_classes)
 
-    _icp_coverages = []
-    _icp_avg_prediction_set_sizes = []
-    _icp_frac_singleton_preds = []
-    _icp_frac_empty_preds = []
+    y_hat = model.predict(first_snapshot.data)
+    y_hat = y_hat[first_snapshot["calibration_indices"]]
 
-    start_time = time.time()
-    for graph in graphs:
-      graph_data = graph["data"]
-      test_indices = graph["test_indices"]
+    y_true = data.y[first_snapshot["calibration_indices"]]
+    y_true = y_true.reshape(-1).detach()
 
-      y_hat = model.predict(graph_data)
-      y_hat = y_hat[test_indices].detach().cpu()
+    icp = create_icp(y_hat, y_true, dataset.num_classes)
 
-      y_true = graph_data.y[test_indices].reshape(-1).detach().cpu()
-
-      confidence_intervals = get_confidence_intervals_icp(icp, y_hat, CONFIDENCE_LEVEL)
-
-      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = evaluation.get_coverage_and_efficiency(confidence_intervals, y_true)
-
-      _icp_coverages.append(coverage)
-      _icp_avg_prediction_set_sizes.append(avg_prediction_set_size)
-      _icp_frac_singleton_preds.append(frac_singleton_pred)
-      _icp_frac_empty_preds.append(frac_empty_pred)
-    
-    icp_prediction_time = time.time() - start_time
-    icp_prediction_times.append(icp_prediction_time)
-    
-    icp_coverages.append(_icp_coverages)
-    icp_avg_prediction_set_sizes.append(_icp_avg_prediction_set_sizes)
-    icp_frac_singleton_preds.append(_icp_frac_singleton_preds)
-    icp_frac_empty_preds.append(_icp_frac_empty_preds)
+    icp_evaluator.capture(model, icp, graphs)
     
     # ICP with resampling
     logger.log("running ICP with resampling")
@@ -316,29 +269,31 @@ def run_train_once_no_resampling():
     _icp_with_resampling_frac_singleton_preds = []
     _icp_with_resampling_frac_empty_preds = []
 
-    start_time = time.time()
     for graph in graphs:
       graph_data = graph["data"]
       test_indices = graph["test_indices"]
+      calibration_indices = graph["calibration_indices"]
 
-      icp = create_icp(model, graph_data, graph["calibration_indices"], dataset.num_classes)
-
+      start_time = time.time()
+      
       y_hat = model.predict(graph_data)
-      y_hat = y_hat[test_indices].detach().cpu()
+      y_hat = y_hat.detach().cpu()
+      y_true = graph_data.y.reshape(-1).detach().cpu()
 
-      y_true = graph_data.y[test_indices].reshape(-1).detach().cpu()
+      icp = create_icp(y_hat[calibration_indices], y_true[calibration_indices], dataset.num_classes)
 
-      confidence_intervals = get_confidence_intervals_icp(icp, y_hat, CONFIDENCE_LEVEL)
+      confidence_intervals = get_confidence_intervals_icp(icp, y_hat[test_indices], CONFIDENCE_LEVEL)
 
-      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = evaluation.get_coverage_and_efficiency(confidence_intervals, y_true)
+      num_predictions = y_hat[test_indices].shape[0]
+      icp_with_resampling_prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
+      icp_with_resampling_prediction_times.append(icp_with_resampling_prediction_time)
+
+      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = evaluation.get_coverage_and_efficiency(confidence_intervals, y_true[test_indices])
 
       _icp_with_resampling_coverages.append(coverage)
       _icp_with_resampling_avg_prediction_set_sizes.append(avg_prediction_set_size)
       _icp_with_resampling_frac_singleton_preds.append(frac_singleton_pred)
       _icp_with_resampling_frac_empty_preds.append(frac_empty_pred)
-    
-    icp_with_resampling_prediction_time = time.time() - start_time
-    icp_with_resampling_prediction_times.append(icp_with_resampling_prediction_time)
     
     icp_with_resampling_coverages.append(_icp_with_resampling_coverages)
     icp_with_resampling_avg_prediction_set_sizes.append(_icp_with_resampling_avg_prediction_set_sizes)
@@ -390,8 +345,7 @@ def run_train_once_no_resampling():
   plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0))
 
   # print icp performance
-  save_cp_performance("icp", icp_coverages, icp_avg_prediction_set_sizes, icp_frac_singleton_preds, icp_frac_empty_preds)
-  save_times("icp_prediction", icp_prediction_times)
+  icp_evaluator.save_results()
   
   # print icp with resampling performance
   save_cp_performance("icp_with_resampling", icp_with_resampling_coverages, icp_with_resampling_avg_prediction_set_sizes, icp_with_resampling_frac_singleton_preds, icp_with_resampling_frac_empty_preds)
