@@ -1,5 +1,7 @@
 import os
 import sys
+
+from lib import data
 module_path = os.path.abspath(os.path.join('../'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -28,21 +30,10 @@ NUM_EXPERIMENTS = 2
 CONFIDENCE_LEVEL = 0.95
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-# arxiv specific
-NODE_YEARS = [2010, 2015, 2020]
-OUTPUT_FOLDER = "output/arxiv/run_train_once_no_resampling/"
-BINS = torch.tensor([0,1,5,10,20,100]) # boundaries[i-1] < input[x] <= boundaries[i]
-MODEL_ARGS = {
-    "num_layers": 3,
-    "hidden_dim": 256,
-    "lr": 0.01,  # learning rate
-    "epochs": 200,
-}
-
-def split_graph(data):
+def split_arxiv_graph(data, years):
   graphs = []
 
-  for year in NODE_YEARS:
+  for year in years:
     indices = torch.nonzero(torch.where(data.node_year[:, 0] <= year, 1, 0))[
         :, 0].tolist()
 
@@ -55,19 +46,19 @@ def split_graph(data):
   return graphs
 
 
-def train_model(graph: Graph, num_features, num_classes):
-  model = GraphSAGE(num_features, MODEL_ARGS["hidden_dim"],
-                    num_classes, MODEL_ARGS["num_layers"]).to(DEVICE)
+def train_model(graph: Graph, model_args):
+  model = GraphSAGE(model_args["num_features"], model_args["hidden_dim"],
+                    model_args["num_classes"], model_args["num_layers"]).to(DEVICE)
 
   # reset the parameters to initial random value
   model.reset_parameters()
 
-  optimizer = torch.optim.Adam(model.parameters(), lr=MODEL_ARGS["lr"])
+  optimizer = torch.optim.Adam(model.parameters(), lr=model_args["lr"])
 
   loss_fn = torch.nn.NLLLoss()
 
-  for epoch in range(1, 1 + MODEL_ARGS["epochs"]):
-      loss = model.train_model(graph.train_data, optimizer, loss_fn)
+  for _ in range(1, 1 + model_args["epochs"]):
+      model.train_model(graph.train_data, optimizer, loss_fn)
 
   return model
 
@@ -101,34 +92,44 @@ def plot(title, x_label, y_label, x, y, output_dir):
   plt.savefig(output_dir + title + ".png")
   plt.close()
 
-def run_train_once_no_resampling():
-  logger = Logger(OUTPUT_FOLDER)
+def run_train_once_no_resampling(dataset, timesteps, degree_bins, model_args, split_graph, output_dir):
+  output_dir = output_dir + "/run_train_once_no_resampling/"
+  logger = Logger(output_dir)
 
   logger.log("STARTED: run_train_once_no_resampling")
 
-  # download dataset using ogb pytorch geometric loader.
-  dataset = PygNodePropPredDataset(name="ogbn-arxiv")
-
   data = dataset[0]  # pyg graph object
 
-  logger.log("dataset loaded")
-
-  plot_class_distribution("full graph", data.y.reshape(-1).detach().numpy(), dataset.num_classes, OUTPUT_FOLDER)
-
+  plot_class_distribution("full graph", data.y.reshape(-1).detach().numpy(), dataset.num_classes, output_dir)
 
   logger.log('Device: {}'.format(DEVICE))
-  
-  graphsage_training_times = []
 
+  # split graph
+  graphs = split_graph(data, timesteps)
+
+  for graph in graphs:
+    plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes, output_dir)
+  for graph in graphs:
+    graph.train_data = graph.train_data.to(DEVICE)
+    graph.data = graph.data.to(DEVICE)
+
+  # train on first snapshot
+  first_snapshot = graphs[0]
+  start_time = time.time()
+  model = train_model(first_snapshot, model_args)
+  graphsage_training_time = time.time() - start_time
+  graphsage_training_times = []
+  graphsage_training_times.append(graphsage_training_time)
+  
   accuracy_scores = []
   macro_f1_scores = []
 
-  icp_evaluator = ICPEvaluator("arxiv_icp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
-  icp_with_resampling_evaluator = ICPWithResamplingEvaluator("arxiv_icp_with_resampling",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
-  mcp_evaluator = MCPEvaluator("arxiv_mcp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
-  nd_mcp_evaluator = NodeDegreeMCPEvaluator("arxiv_node_degree_mcp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
-  nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_node_degree_weighted_cp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
-  embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_embedding_weighted_cp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
+  icp_evaluator = ICPEvaluator("arxiv_icp", timesteps, output_dir, CONFIDENCE_LEVEL)
+  icp_with_resampling_evaluator = ICPWithResamplingEvaluator("arxiv_icp_with_resampling", timesteps, output_dir, CONFIDENCE_LEVEL)
+  mcp_evaluator = MCPEvaluator("arxiv_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+  nd_mcp_evaluator = NodeDegreeMCPEvaluator("arxiv_node_degree_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+  nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_node_degree_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
+  embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_embedding_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
 
   for experiment_num in range(NUM_EXPERIMENTS):
     logger.log("Experiment {} started".format(experiment_num))
@@ -137,17 +138,13 @@ def run_train_once_no_resampling():
     graphs = split_graph(data)
 
     for graph in graphs:
-      plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes, OUTPUT_FOLDER)
+      plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes, output_dir)
     for graph in graphs:
       graph.train_data = graph.train_data.to(DEVICE)
       graph.data = graph.data.to(DEVICE)
 
     # train on first snapshot
     first_snapshot = graphs[0]
-    start_time = time.time()
-    model = train_model(first_snapshot, data.num_features, dataset.num_classes)
-    graphsage_training_time = time.time() - start_time
-    graphsage_training_times.append(graphsage_training_time)
 
     y_hat = model.predict(first_snapshot.data)
     y_hat = y_hat[first_snapshot.test_indices]
@@ -210,9 +207,9 @@ def run_train_once_no_resampling():
     # Node degree MCP
     logger.log("running node degree MCP")
 
-    nd_mcp = create_node_degree_mcp(model, first_snapshot.data, first_snapshot.calibration_indices, BINS)
+    nd_mcp = create_node_degree_mcp(model, first_snapshot.data, first_snapshot.calibration_indices, degree_bins)
 
-    nd_mcp_evaluator.capture(model, nd_mcp, graphs, BINS)
+    nd_mcp_evaluator.capture(model, nd_mcp, graphs, degree_bins)
 
     # Node degree weighted CP
     logger.log("running node degree weighted CP")
@@ -229,10 +226,10 @@ def run_train_once_no_resampling():
     embedding_weighted_cp_evaluator.capture(model, embedding_weighted_cp, graphs)
 
   # save graphsage training time
-  save_times("graphsage_training", graphsage_training_times, OUTPUT_FOLDER)
+  save_times("graphsage_training", graphsage_training_times, output_dir)
 
   # plot model performance
-  plot("graphsage_performance", "Timestep", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0), OUTPUT_FOLDER)
+  plot("graphsage_performance", "Timestep", "Accuracy", timesteps, np.mean(accuracy_scores, axis=0), output_dir)
 
   # print cp performance
   icp_evaluator.save_results()
@@ -242,9 +239,24 @@ def run_train_once_no_resampling():
   nd_weighted_cp_evaluator.save_results()
   embedding_weighted_cp_evaluator.save_results()
 
+def run_arxiv():
+  # download dataset using ogb pytorch geometric loader.
+  dataset = PygNodePropPredDataset(name="ogbn-arxiv")
 
+  # arxiv specific
+  timesteps = [2010, 2015, 2020]
+  degree_bins = torch.tensor([0,1,5,10,20,100]) # boundaries[i-1] < input[x] <= boundaries[i]
+  model_args = {
+      "num_layers": 3,
+      "hidden_dim": 256,
+      "lr": 0.01,  # learning rate
+      "epochs": 200,
+      "num_classes": dataset.num_classes,
+      "num_features": dataset[0].num_features,
+  }
+  output_dir = "output/arxiv"
 
+  run_train_once_no_resampling(dataset, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
 
-
-# run tests
-run_train_once_no_resampling()
+# run experiments
+run_arxiv()
