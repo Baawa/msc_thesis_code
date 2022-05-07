@@ -22,22 +22,33 @@ class CPEvaluator(object):
   def save_results(self):
     time_avg = np.mean(self.prediction_times)
     time_std = np.std(self.prediction_times)
-    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg], [time_std]], headers=["avg","std"]))
+    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg, time_std]], headers=["avg","std"]))
 
-    coverage_avg = ["coverage avg"].append(np.mean(self.coverages, axis=0))
-    coverage_std = ["coverage std"].append(np.std(self.coverages, axis=0))
+    coverage_avg = ["coverage avg"]
+    coverage_avg.extend(np.mean(np.array(self.coverages), axis=0).tolist())
+    coverage_std = ["coverage std"]
+    coverage_std.extend(np.std(np.array(self.coverages), axis=0).tolist())
     
-    avg_prediction_set_size_avg = ["avg prediction set size avg"].append(np.mean(self.avg_prediction_set_sizes, axis=0))
-    avg_prediction_set_size_std = ["avg prediction set size std"].append(np.std(self.avg_prediction_set_sizes, axis=0))
+    avg_prediction_set_size_avg = ["avg prediction set size avg"]
+    avg_prediction_set_size_avg.extend(np.mean(np.array(self.avg_prediction_set_sizes), axis=0).tolist())
+    avg_prediction_set_size_std = ["avg prediction set size std"]
+    avg_prediction_set_size_std.extend(np.std(np.array(self.avg_prediction_set_sizes), axis=0).tolist())
     
-    frac_singleton_pred_avg = ["frac singleton pred avg"].append(np.mean(self.frac_singleton_preds, axis=0))
-    frac_singleton_pred_std = ["frac singleton pred std"].append(np.std(self.frac_singleton_preds, axis=0))
+    frac_singleton_pred_avg = ["frac singleton pred avg"]
+    frac_singleton_pred_avg.extend(np.mean(np.array(self.frac_singleton_preds), axis=0).tolist())
+    frac_singleton_pred_std = ["frac singleton pred std"]
+    frac_singleton_pred_std.extend(np.std(np.array(self.frac_singleton_preds), axis=0).tolist())
     
-    frac_empty_pred_avg = ["frac empty pred avg"].append(np.mean(self.frac_empty_preds, axis=0))
-    frac_empty_pred_std = ["frac empty pred std"].append(np.std(self.frac_empty_preds, axis=0))
+    frac_empty_pred_avg = ["frac empty pred avg"]
+    frac_empty_pred_avg.extend(np.mean(np.array(self.frac_empty_preds), axis=0).tolist())
+    frac_empty_pred_std = ["frac empty pred std"]
+    frac_empty_pred_std.extend(np.std(np.array(self.frac_empty_preds), axis=0).tolist())
     
     scores = [coverage_avg, coverage_std, avg_prediction_set_size_avg, avg_prediction_set_size_std, frac_singleton_pred_avg, frac_singleton_pred_std, frac_empty_pred_avg, frac_empty_pred_std]
-    self._save_results("results_{}_performance.txt".format(self.title), tabulate(scores, headers=self.time_steps))
+    print(scores)
+    print(self.timesteps)
+    print(self.title)
+    self._save_results("results_{}_performance.txt".format(self.title), tabulate(scores, headers=self.timesteps))
   
   def _save_results(self, file, str):
     try:
@@ -167,8 +178,8 @@ class NodeDegreeMCPEvaluator(CPEvaluator):
 
       # get node degrees
       node_ids, some_node_degrees = torch.unique(graph.data.edge_index[1], return_counts=True)
-      node_degrees = torch.zeros(graph.data.x.shape[0]).long()
-      node_degrees[node_ids] = some_node_degrees
+      node_degrees = torch.zeros(graph.data.x.shape[0]).long().cpu()
+      node_degrees[node_ids] = some_node_degrees.cpu()
 
       node_degrees = node_degrees[test_indices]  # only use calibration nodes
 
@@ -237,8 +248,8 @@ class NodeDegreeWeightedCPEvaluator(CPEvaluator):
 
       # get node degrees
       node_ids, some_node_degrees = torch.unique(graph.data.edge_index[1], return_counts=True)
-      node_degrees = torch.zeros(graph.data.x.shape[0]).long()
-      node_degrees[node_ids] = some_node_degrees
+      node_degrees = torch.zeros(graph.data.x.shape[0]).long().cpu()
+      node_degrees[node_ids] = some_node_degrees.cpu()
 
       confidence_intervals = get_confidence_intervals_node_degree_weighted(cp, y_hat, node_degrees.cpu(), self.confidence_level)
 
@@ -402,8 +413,8 @@ def create_node_degree_mcp(model, data, calibration_indices, bins):
   # get node degrees
   node_ids, node_degrees_per_id = torch.unique(data.edge_index[1], return_counts=True) # note: nodes with degree 0, won't be represented
   
-  node_degrees = torch.zeros(data.x.shape[0]).long()
-  node_degrees[node_ids] = node_degrees_per_id
+  node_degrees = torch.zeros(data.x.shape[0]).long().cpu()
+  node_degrees[node_ids] = node_degrees_per_id.cpu()
 
   node_degrees = node_degrees[calibration_indices] # only use calibration nodes
 
@@ -431,8 +442,8 @@ def create_node_degree_weighted_cp(model, data, calibration_indices):
 
   # get node degrees
   node_ids, node_degrees_per_id = torch.unique(data.edge_index[1], return_counts=True) # note: nodes with degree 0, won't be represented
-  node_degrees = torch.zeros(data.x.shape[0]).long()
-  node_degrees[node_ids] = node_degrees_per_id
+  node_degrees = torch.zeros(data.x.shape[0]).long().cpu()
+  node_degrees[node_ids] = node_degrees_per_id.cpu()
 
   node_degrees = node_degrees[calibration_indices] # only use calibration nodes
 

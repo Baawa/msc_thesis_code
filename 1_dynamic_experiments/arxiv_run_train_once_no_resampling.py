@@ -36,11 +36,11 @@ MODEL_ARGS = {
     "num_layers": 3,
     "hidden_dim": 256,
     "lr": 0.01,  # learning rate
-    "epochs": 100,
+    "epochs": 200,
 }
 
 def split_graph(data):
-  graphs = [Graph]
+  graphs = []
 
   for year in NODE_YEARS:
     indices = torch.nonzero(torch.where(data.node_year[:, 0] <= year, 1, 0))[
@@ -91,7 +91,7 @@ def plot_class_distribution(ext, y, num_classes, output_dir):
 def save_times(prefix, times, output_dir):
   time_avg = np.mean(times)
   time_std = np.std(times)
-  save_results(output_dir, "{}_time.txt".format(prefix), tabulate([[time_avg], [time_std]], headers=["avg","std"]))
+  save_results(output_dir, "{}_time.txt".format(prefix), tabulate([[time_avg, time_std]], headers=["avg","std"]))
 
 def plot(title, x_label, y_label, x, y, output_dir):
   plt.title(title)
@@ -113,7 +113,7 @@ def run_train_once_no_resampling():
 
   logger.log("dataset loaded")
 
-  plot_class_distribution("full graph", data.y.reshape(-1).detach().numpy(), dataset.num_classes)
+  plot_class_distribution("full graph", data.y.reshape(-1).detach().numpy(), dataset.num_classes, OUTPUT_FOLDER)
 
 
   logger.log('Device: {}'.format(DEVICE))
@@ -137,7 +137,7 @@ def run_train_once_no_resampling():
     graphs = split_graph(data)
 
     for graph in graphs:
-      plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes)
+      plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes, OUTPUT_FOLDER)
     for graph in graphs:
       graph.train_data = graph.train_data.to(DEVICE)
       graph.data = graph.data.to(DEVICE)
@@ -198,7 +198,7 @@ def run_train_once_no_resampling():
     # ICP with resampling
     logger.log("running ICP with resampling")
     
-    icp_with_resampling_evaluator.capture(model, graphs, dataset.num_classes, CONFIDENCE_LEVEL)
+    icp_with_resampling_evaluator.capture(model, graphs, dataset.num_classes)
 
     # MCP
     logger.log("running MCP")

@@ -157,9 +157,13 @@ class GraphSAGE(torch.nn.Module):
   def predict(self, data):
     self.eval()
     
-    out = self(data.x, data.edge_index)
+    if self.return_embeds:
+        y_hat, embeddings = self(data.x, data.edge_index)
+        return y_hat.clone().detach(), embeddings
+        
+    y_hat = self(data.x, data.edge_index)
     
-    return out.clone().detach()
+    return y_hat.clone().detach()
 
   def set_return_embeds(self, return_embeds: bool):
     self.return_embeds = return_embeds
