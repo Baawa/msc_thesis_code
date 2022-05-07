@@ -1,4 +1,3 @@
-
 import os
 import sys
 module_path = os.path.abspath(os.path.join('../'))
@@ -21,16 +20,18 @@ os.environ['DISPLAY']=':1.0'    # tell X clients to use our virtual DISPLAY :1.0
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import time
-from cp_evaluators import ICPEvaluator, ICPWithResamplingEvaluator, create_icp, create_mcp, MCPEvaluator
+from cp_evaluators import ICPEvaluator, ICPWithResamplingEvaluator, create_icp, create_mcp, MCPEvaluator, NodeDegreeMCPEvaluator, create_node_degree_mcp, NodeDegreeWeightedCPEvaluator, create_node_degree_weighted_cp, EmbeddingWeightedCPEvaluator, create_embedding_weighted_cp
 from graph import Graph
 
 
-NUM_EXPERIMENTS = 3
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-NODE_YEARS = [2000, 2005, 2010, 2015, 2020]
+NUM_EXPERIMENTS = 2
 CONFIDENCE_LEVEL = 0.95
-OUTPUT_FOLDER = "output/arxiv/run_train_once_no_resampling/"
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+# arxiv specific
+NODE_YEARS = [2010, 2015, 2020]
+OUTPUT_FOLDER = "output/arxiv/run_train_once_no_resampling/"
+BINS = torch.tensor([0,1,5,10,20,100]) # boundaries[i-1] < input[x] <= boundaries[i]
 MODEL_ARGS = {
     "num_layers": 3,
     "hidden_dim": 256,
@@ -125,6 +126,9 @@ def run_train_once_no_resampling():
   icp_evaluator = ICPEvaluator("arxiv_icp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
   icp_with_resampling_evaluator = ICPWithResamplingEvaluator("arxiv_icp_with_resampling",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
   mcp_evaluator = MCPEvaluator("arxiv_mcp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
+  nd_mcp_evaluator = NodeDegreeMCPEvaluator("arxiv_node_degree_mcp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
+  nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_node_degree_weighted_cp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
+  embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_embedding_weighted_cp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
 
   for experiment_num in range(NUM_EXPERIMENTS):
     logger.log("Experiment {} started".format(experiment_num))
@@ -182,9 +186,9 @@ def run_train_once_no_resampling():
     logger.log("running ICP")
 
     y_hat = model.predict(first_snapshot.data)
-    y_hat = y_hat[first_snapshot["calibration_indices"]]
+    y_hat = y_hat[first_snapshot.calibration_indices]
 
-    y_true = data.y[first_snapshot["calibration_indices"]]
+    y_true = data.y[first_snapshot.calibration_indices]
     y_true = y_true.reshape(-1).detach()
 
     icp = create_icp(y_hat, y_true, dataset.num_classes)
@@ -199,24 +203,44 @@ def run_train_once_no_resampling():
     # MCP
     logger.log("running MCP")
     
-    mcp = create_mcp(model, first_snapshot["data"], first_snapshot["calibration_indices"])
+    mcp = create_mcp(model, first_snapshot.data, first_snapshot.calibration_indices)
 
     mcp_evaluator.capture(model, mcp, graphs)
+
+    # Node degree MCP
+    logger.log("running node degree MCP")
+
+    nd_mcp = create_node_degree_mcp(model, first_snapshot.data, first_snapshot.calibration_indices, BINS)
+
+    nd_mcp_evaluator.capture(model, nd_mcp, graphs, BINS)
+
+    # Node degree weighted CP
+    logger.log("running node degree weighted CP")
+
+    nd_weighted_cp = create_node_degree_weighted_cp(model, first_snapshot.data, first_snapshot.calibration_indices)
+
+    nd_weighted_cp_evaluator.capture(model, nd_weighted_cp, graphs)
+    
+    # Embedding weighted CP
+    logger.log("running embedding weighted CP")
+
+    embedding_weighted_cp = create_embedding_weighted_cp(model, first_snapshot.data, first_snapshot.calibration_indices)
+
+    embedding_weighted_cp_evaluator.capture(model, embedding_weighted_cp, graphs)
 
   # save graphsage training time
   save_times("graphsage_training", graphsage_training_times, OUTPUT_FOLDER)
 
   # plot model performance
-  plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0), OUTPUT_FOLDER)
+  plot("graphsage_performance", "Timestep", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0), OUTPUT_FOLDER)
 
-  # print icp performance
+  # print cp performance
   icp_evaluator.save_results()
-  
-  # print icp with resampling performance
   icp_with_resampling_evaluator.save_results()
-  
-  # print mcp performance
   mcp_evaluator.save_results()
+  nd_mcp_evaluator.save_results()
+  nd_weighted_cp_evaluator.save_results()
+  embedding_weighted_cp_evaluator.save_results()
 
 
 

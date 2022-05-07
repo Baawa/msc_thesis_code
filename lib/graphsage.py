@@ -44,11 +44,11 @@ class GraphSAGEWithSampling(torch.nn.Module):
     
     # output layer
     embedding = self.convs[-1](x=embedding, edge_index=adj_t)
-
-    if self.return_embeds:
-      return embedding
     
     node_class = self.softmax(embedding)
+
+    if self.return_embeds:
+      return node_class, embedding
 
     return node_class
 
@@ -131,10 +131,10 @@ class GraphSAGE(torch.nn.Module):
     # output layer
     embedding = self.convs[-1](x=embedding, edge_index=adj_t)
 
-    if self.return_embeds:
-      return embedding
-
     node_class = self.softmax(embedding)
+
+    if self.return_embeds:
+      return node_class, embedding
 
     return node_class
 
