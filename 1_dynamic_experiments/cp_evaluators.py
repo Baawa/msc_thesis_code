@@ -5,6 +5,7 @@ from graph import Graph
 from lib.conformal_predictor import InductiveConformalClassifier, MondrianConformalClassifier, NodeDegreeMondrianConformalClassifier, NodeDegreeWeightedConformalClassifier, get_nonconformity_measure_for_classification
 import time
 from lib.evaluation import get_coverage_and_efficiency
+import torch
 
 class CPEvaluator(object):
   def __init__(self, title, timesteps, output_dir, confidence_level):
@@ -78,6 +79,79 @@ class ICPEvaluator(CPEvaluator):
     self.frac_singleton_preds.append(frac_singleton_preds)
     self.frac_empty_preds.append(frac_empty_preds)
 
+class ICPWithResamplingEvaluator(CPEvaluator):
+  def capture(self, model, graphs: "list[Graph]", num_classes):
+    coverages = []
+    avg_prediction_set_sizes = []
+    frac_singleton_preds = []
+    frac_empty_preds = []
+
+    for graph in graphs:
+      test_indices = graph.test_indices
+      calibration_indices = graph.calibration_indices
+
+      start_time = time.time()
+      
+      y_hat = model.predict(graph.data)
+      y_hat = y_hat.detach().cpu()
+      y_true = graph.data.y.reshape(-1).detach().cpu()
+
+      icp = create_icp(y_hat[calibration_indices], y_true[calibration_indices], num_classes)
+
+      confidence_intervals = get_confidence_intervals_icp(icp, y_hat[test_indices], self.confidence_level)
+
+      num_predictions = y_hat[test_indices].shape[0]
+      prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
+      self.prediction_times.append(prediction_time)
+
+      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[test_indices])
+
+      coverages.append(coverage)
+      avg_prediction_set_sizes.append(avg_prediction_set_size)
+      frac_singleton_preds.append(frac_singleton_pred)
+      frac_empty_preds.append(frac_empty_pred)
+    
+    self.coverages.append(coverages)
+    self.avg_prediction_set_sizes.append(avg_prediction_set_sizes)
+    self.frac_singleton_preds.append(frac_singleton_preds)
+    self.frac_empty_preds.append(frac_empty_preds)
+
+class MCPEvaluator(CPEvaluator):
+  def capture(self, model, mcp: MondrianConformalClassifier, graphs: "list[Graph]"):
+    coverages = []
+    avg_prediction_set_sizes = []
+    frac_singleton_preds = []
+    frac_empty_preds = []
+
+    for graph in graphs:
+      test_indices = graph.test_indices
+
+      start_time = time.time()
+      y_hat = model.predict(graph.data)
+      y_hat = y_hat[test_indices].detach().cpu()
+
+      y_true = graph.data.y[test_indices].reshape(-1).detach().cpu()
+
+      confidence_intervals = get_confidence_intervals_mcp(mcp, y_hat, self.confidence_level)
+
+      num_predictions = y_hat.shape[0]
+      prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
+      self.prediction_times.append(prediction_time)
+
+      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true)
+
+      coverages.append(coverage)
+      avg_prediction_set_sizes.append(avg_prediction_set_size)
+      frac_singleton_preds.append(frac_singleton_pred)
+      frac_empty_preds.append(frac_empty_pred)
+    
+    self.coverages.append(coverages)
+    self.avg_prediction_set_sizes.append(avg_prediction_set_sizes)
+    self.frac_singleton_preds.append(frac_singleton_preds)
+    self.frac_empty_preds.append(frac_empty_preds)
+
+# helpers
+
 def get_elapsed_time_per_unit(start_time, units):
   return (time.time() - start_time) / units
 
@@ -89,3 +163,46 @@ def get_confidence_intervals_icp(cp, y_hat, confidence_level=0.95):
     confidence_intervals.append(ci)
   
   return confidence_intervals
+
+def get_confidence_intervals_mcp(cp, y_hat, confidence_level=0.95):
+  confidence_intervals = []
+  for yi in y_hat:
+    alphas = get_nonconformity_measure_for_classification(yi)
+    max_y = yi.argmax(dim=-1, keepdim=True)
+    ci = cp.predict(alphas, max_y, confidence_level)
+    confidence_intervals.append(ci)
+  
+  return confidence_intervals
+
+def create_icp(y_hat, y_true, num_classes):
+  alphas = []
+  for y_probas, yt in zip(y_hat,y_true):
+    y = yt.item()
+    a = get_nonconformity_measure_for_classification(y_probas)
+    alphas.append(a[y])
+
+  alphas = torch.tensor(alphas)
+
+  icp = InductiveConformalClassifier(alphas.cpu(), num_classes)
+
+  return icp
+
+def create_mcp(model, data, calibration_indices):
+  y_hat = model.predict(data)
+  y_hat = y_hat[calibration_indices]
+
+  y_true = data.y[calibration_indices]
+  y_true = y_true.reshape(-1).detach()
+
+  alphas = []
+  for y_probas, yt in zip(y_hat,y_true):
+    y = yt.item()
+    a = get_nonconformity_measure_for_classification(y_probas)
+    alphas.append(a[y])
+
+  alphas = torch.tensor(alphas)
+  y = y_true
+
+  mcp = MondrianConformalClassifier(alphas.cpu(), y.cpu())
+
+  return mcp

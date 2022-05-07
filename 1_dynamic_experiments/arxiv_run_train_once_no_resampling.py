@@ -9,7 +9,6 @@ import torch
 import numpy as np
 from ogb.nodeproppred import PygNodePropPredDataset
 from lib.logger import Logger
-from lib.conformal_predictor import InductiveConformalClassifier, get_nonconformity_measure_for_classification, MondrianConformalClassifier
 from lib import evaluation
 from lib.graphsage import GraphSAGE
 from lib.data import split, split_dataset
@@ -22,7 +21,7 @@ os.environ['DISPLAY']=':1.0'    # tell X clients to use our virtual DISPLAY :1.0
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import time
-from cp_evaluators import ICPEvaluator
+from cp_evaluators import ICPEvaluator, ICPWithResamplingEvaluator, create_icp, create_mcp, MCPEvaluator
 from graph import Graph
 
 
@@ -71,18 +70,8 @@ def train_model(graph: Graph, num_features, num_classes):
 
   return model
 
-def get_confidence_intervals_mcp(cp, y_hat, confidence_level=0.95):
-  confidence_intervals = []
-  for yi in y_hat:
-    alphas = get_nonconformity_measure_for_classification(yi)
-    max_y = yi.argmax(dim=-1, keepdim=True)
-    ci = cp.predict(alphas, max_y, confidence_level)
-    confidence_intervals.append(ci)
-  
-  return confidence_intervals
 
-def save_results(file, str):
-  output_dir = OUTPUT_FOLDER
+def save_results(output_dir, file, str):
   try:
     os.makedirs(output_dir, exist_ok=True)
   finally:
@@ -90,74 +79,25 @@ def save_results(file, str):
     f.write(str)
     f.close()
 
-def plot_class_distribution(ext, y, num_classes):
+def plot_class_distribution(ext, y, num_classes, output_dir):
   plt.title("Class distribution {}".format(ext))
   plt.hist(y, num_classes)
   plt.xlabel("Class")
   plt.ylabel("num of nodes")
-  plt.savefig(OUTPUT_FOLDER + "class-dist-{}.png".format(ext))
+  plt.savefig(output_dir + "class-dist-{}.png".format(ext))
   plt.close()
 
-def create_icp(y_hat, y_true, num_classes):
-  alphas = []
-  for y_probas, yt in zip(y_hat,y_true):
-    y = yt.item()
-    a = get_nonconformity_measure_for_classification(y_probas)
-    alphas.append(a[y])
-
-  alphas = torch.tensor(alphas)
-
-  icp = InductiveConformalClassifier(alphas.cpu(), num_classes)
-
-  return icp
-
-def create_mcp(model, data, calibration_indices):
-  y_hat = model.predict(data)
-  y_hat = y_hat[calibration_indices]
-
-  y_true = data.y[calibration_indices]
-  y_true = y_true.reshape(-1).detach()
-
-  alphas = []
-  for y_probas, yt in zip(y_hat,y_true):
-    y = yt.item()
-    a = get_nonconformity_measure_for_classification(y_probas)
-    alphas.append(a[y])
-
-  alphas = torch.tensor(alphas)
-  y = y_true
-
-  mcp = MondrianConformalClassifier(alphas.cpu(), y.cpu())
-
-  return mcp
-
-def save_times(prefix, times):
+def save_times(prefix, times, output_dir):
   time_avg = np.mean(times)
   time_std = np.std(times)
-  save_results("{}_time.txt".format(prefix), tabulate([[time_avg], [time_std]], headers=["avg","std"]))
+  save_results(output_dir, "{}_time.txt".format(prefix), tabulate([[time_avg], [time_std]], headers=["avg","std"]))
 
-def save_cp_performance(prefix, coverages, avg_prediction_set_sizes, frac_singleton_preds, frac_empty_preds):
-  coverage_avg = ["coverage avg"].append(np.mean(coverages, axis=0))
-  coverage_std = ["coverage std"].append(np.std(coverages, axis=0))
-  
-  avg_prediction_set_size_avg = ["avg prediction set size avg"].append(np.mean(avg_prediction_set_sizes, axis=0))
-  avg_prediction_set_size_std = ["avg prediction set size std"].append(np.std(avg_prediction_set_sizes, axis=0))
-  
-  frac_singleton_pred_avg = ["frac singleton pred avg"].append(np.mean(frac_singleton_preds, axis=0))
-  frac_singleton_pred_std = ["frac singleton pred std"].append(np.std(frac_singleton_preds, axis=0))
-  
-  frac_empty_pred_avg = ["frac empty pred avg"].append(np.mean(frac_empty_preds, axis=0))
-  frac_empty_pred_std = ["frac empty pred std"].append(np.std(frac_empty_preds, axis=0))
-  
-  scores = [coverage_avg, coverage_std, avg_prediction_set_size_avg, avg_prediction_set_size_std, frac_singleton_pred_avg, frac_singleton_pred_std, frac_empty_pred_avg, frac_empty_pred_std]
-  save_results("{}_performance.txt".format(prefix), tabulate(scores, headers=NODE_YEARS))
-
-def plot(title, x_label, y_label, x, y):
+def plot(title, x_label, y_label, x, y, output_dir):
   plt.title(title)
   plt.xlabel(x_label)
   plt.ylabel(y_label)
   plt.plot(x, y, "+-")
-  plt.savefig(OUTPUT_FOLDER + title + ".png")
+  plt.savefig(output_dir + title + ".png")
   plt.close()
 
 def run_train_once_no_resampling():
@@ -183,18 +123,8 @@ def run_train_once_no_resampling():
   macro_f1_scores = []
 
   icp_evaluator = ICPEvaluator("arxiv_icp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
-  
-  icp_with_resampling_coverages = []
-  icp_with_resampling_avg_prediction_set_sizes = []
-  icp_with_resampling_frac_singleton_preds = []
-  icp_with_resampling_frac_empty_preds = []
-  icp_with_resampling_prediction_times = []
-
-  mcp_coverages = []
-  mcp_avg_prediction_set_sizes = []
-  mcp_frac_singleton_preds = []
-  mcp_frac_empty_preds = []
-  mcp_prediction_times = []
+  icp_with_resampling_evaluator = ICPWithResamplingEvaluator("arxiv_icp_with_resampling",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
+  mcp_evaluator = MCPEvaluator("arxiv_mcp",NODE_YEARS,OUTPUT_FOLDER,CONFIDENCE_LEVEL)
 
   for experiment_num in range(NUM_EXPERIMENTS):
     logger.log("Experiment {} started".format(experiment_num))
@@ -264,96 +194,29 @@ def run_train_once_no_resampling():
     # ICP with resampling
     logger.log("running ICP with resampling")
     
-    _icp_with_resampling_coverages = []
-    _icp_with_resampling_avg_prediction_set_sizes = []
-    _icp_with_resampling_frac_singleton_preds = []
-    _icp_with_resampling_frac_empty_preds = []
-
-    for graph in graphs:
-      graph_data = graph["data"]
-      test_indices = graph["test_indices"]
-      calibration_indices = graph["calibration_indices"]
-
-      start_time = time.time()
-      
-      y_hat = model.predict(graph_data)
-      y_hat = y_hat.detach().cpu()
-      y_true = graph_data.y.reshape(-1).detach().cpu()
-
-      icp = create_icp(y_hat[calibration_indices], y_true[calibration_indices], dataset.num_classes)
-
-      confidence_intervals = get_confidence_intervals_icp(icp, y_hat[test_indices], CONFIDENCE_LEVEL)
-
-      num_predictions = y_hat[test_indices].shape[0]
-      icp_with_resampling_prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-      icp_with_resampling_prediction_times.append(icp_with_resampling_prediction_time)
-
-      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = evaluation.get_coverage_and_efficiency(confidence_intervals, y_true[test_indices])
-
-      _icp_with_resampling_coverages.append(coverage)
-      _icp_with_resampling_avg_prediction_set_sizes.append(avg_prediction_set_size)
-      _icp_with_resampling_frac_singleton_preds.append(frac_singleton_pred)
-      _icp_with_resampling_frac_empty_preds.append(frac_empty_pred)
-    
-    icp_with_resampling_coverages.append(_icp_with_resampling_coverages)
-    icp_with_resampling_avg_prediction_set_sizes.append(_icp_with_resampling_avg_prediction_set_sizes)
-    icp_with_resampling_frac_singleton_preds.append(_icp_with_resampling_frac_singleton_preds)
-    icp_with_resampling_frac_empty_preds.append(_icp_with_resampling_frac_empty_preds)
+    icp_with_resampling_evaluator.capture(model, graphs, dataset.num_classes, CONFIDENCE_LEVEL)
 
     # MCP
     logger.log("running MCP")
     
     mcp = create_mcp(model, first_snapshot["data"], first_snapshot["calibration_indices"])
 
-    _mcp_coverages = []
-    _mcp_avg_prediction_set_sizes = []
-    _mcp_frac_singleton_preds = []
-    _mcp_frac_empty_preds = []
-
-    start_time = time.time()
-    for graph in graphs:
-      graph_data = graph["data"]
-      test_indices = graph["test_indices"]
-
-      y_hat = model.predict(graph_data)
-      y_hat = y_hat[test_indices].detach().cpu()
-
-      y_true = graph_data.y[test_indices].reshape(-1).detach().cpu()
-
-      confidence_intervals = get_confidence_intervals_mcp(mcp, y_hat, CONFIDENCE_LEVEL)
-
-      coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = evaluation.get_coverage_and_efficiency(confidence_intervals, y_true)
-
-      _mcp_coverages.append(coverage)
-      _mcp_avg_prediction_set_sizes.append(avg_prediction_set_size)
-      _mcp_frac_singleton_preds.append(frac_singleton_pred)
-      _mcp_frac_empty_preds.append(frac_empty_pred)
-    
-    mcp_prediction_time = time.time() - start_time
-    mcp_prediction_times.append(mcp_prediction_time)
-    
-    mcp_coverages.append(_mcp_coverages)
-    mcp_avg_prediction_set_sizes.append(_mcp_avg_prediction_set_sizes)
-    mcp_frac_singleton_preds.append(_mcp_frac_singleton_preds)
-    mcp_frac_empty_preds.append(_mcp_frac_empty_preds)
-
+    mcp_evaluator.capture(model, mcp, graphs)
 
   # save graphsage training time
-  save_times("graphsage_training", graphsage_training_times)
+  save_times("graphsage_training", graphsage_training_times, OUTPUT_FOLDER)
 
   # plot model performance
-  plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0))
+  plot("graphsage_performance", "Year", "Accuracy", NODE_YEARS, np.mean(accuracy_scores, axis=0), OUTPUT_FOLDER)
 
   # print icp performance
   icp_evaluator.save_results()
   
   # print icp with resampling performance
-  save_cp_performance("icp_with_resampling", icp_with_resampling_coverages, icp_with_resampling_avg_prediction_set_sizes, icp_with_resampling_frac_singleton_preds, icp_with_resampling_frac_empty_preds)
-  save_times("icp_with_resampling_prediction", icp_with_resampling_prediction_times)
-
+  icp_with_resampling_evaluator.save_results()
+  
   # print mcp performance
-  save_cp_performance("mcp", mcp_coverages, mcp_avg_prediction_set_sizes, mcp_frac_singleton_preds, mcp_frac_empty_preds)
-  save_times("mcp_prediction", mcp_prediction_times)
+  mcp_evaluator.save_results()
 
 
 
