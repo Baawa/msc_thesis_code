@@ -53,3 +53,8 @@ go to localhost:8888
 
 copy-paste token from jupyter notebook command
 ```
+
+Download from VM:
+```
+scp -i .ssh/id_ed25519 -r ubuntu@130.61.254.191:msc_thesis_code/1_dynamic_experiments/output Downloads/arxiv_output
+```
