@@ -45,9 +45,6 @@ class CPEvaluator(object):
     frac_empty_pred_std.extend(np.std(np.array(self.frac_empty_preds), axis=0).tolist())
     
     scores = [coverage_avg, coverage_std, avg_prediction_set_size_avg, avg_prediction_set_size_std, frac_singleton_pred_avg, frac_singleton_pred_std, frac_empty_pred_avg, frac_empty_pred_std]
-    print(scores)
-    print(self.timesteps)
-    print(self.title)
     self._save_results("results_{}_performance.txt".format(self.title), tabulate(scores, headers=self.timesteps))
   
   def _save_results(self, file, str):
