@@ -1,3 +1,9 @@
+import os
+import sys
+module_path = os.path.abspath(os.path.join('../'))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
 from model_evaluator import ModelEvaluator
 from graph import Graph
 from cp_evaluators import ICPEvaluator, ICPWithResamplingEvaluator, create_icp, create_mcp, MCPEvaluator, NodeDegreeMCPEvaluator, create_node_degree_mcp, NodeDegreeWeightedCPEvaluator, create_node_degree_weighted_cp, EmbeddingWeightedCPEvaluator, create_embedding_weighted_cp
@@ -10,15 +16,10 @@ from lib import evaluation
 from lib.logger import Logger
 from ogb.nodeproppred import PygNodePropPredDataset
 import torch
-import os
-import sys
+
 from torch_geometric.datasets import Reddit
 import pandas as pd
 from torch_geometric.data import Data
-
-module_path = os.path.abspath(os.path.join('../'))
-if module_path not in sys.path:
-    sys.path.append(module_path)
 
 
 # special setting for plotting on ubuntu
@@ -28,7 +29,7 @@ os.system('Xvfb :1 -screen 0 1600x1200x16  &')
 os.environ['DISPLAY'] = ':1.0'
 
 
-NUM_EXPERIMENTS = 10
+NUM_EXPERIMENTS = 5
 CONFIDENCE_LEVEL = 0.95
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
