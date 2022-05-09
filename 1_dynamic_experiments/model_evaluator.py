@@ -15,8 +15,8 @@ class ModelEvaluator(object):
     self.prediction_times = []
   
   def capture(self, model, graphs:"list[Graph]"):
-    _accuracy_scores = []
-    _macro_f1_scores = []
+    accuracy_scores = []
+    macro_f1_scores = []
 
     for graph in graphs:
       start_time = time.time()
@@ -33,11 +33,11 @@ class ModelEvaluator(object):
       y_true = graph.data.y[graph.test_indices].reshape(-1).detach().cpu()
 
       acc, macro_f1 = get_multiclass_classification_performance(y_hat, y_true)
-      _accuracy_scores.append(acc)
-      _macro_f1_scores.append(macro_f1)
+      accuracy_scores.append(acc)
+      macro_f1_scores.append(macro_f1)
     
-    self.accuracy_scores.append(_accuracy_scores)
-    self.macro_f1_scores.append(macro_f1)
+    self.accuracy_scores.append(accuracy_scores)
+    self.macro_f1_scores.append(macro_f1_scores)
 
   def save_results(self):
     time_avg = np.mean(self.prediction_times)

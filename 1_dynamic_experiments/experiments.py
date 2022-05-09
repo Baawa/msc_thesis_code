@@ -1,19 +1,16 @@
 import os
 import sys
 
-from lib import data
 module_path = os.path.abspath(os.path.join('../'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
 import torch
-import numpy as np
 from ogb.nodeproppred import PygNodePropPredDataset
 from lib.logger import Logger
 from lib import evaluation
 from lib.graphsage import GraphSAGE
 from lib.data import split, split_dataset
-from lib.util import plot
 
 # special setting for plotting on ubuntu
 os.system('Xvfb :1 -screen 0 1600x1200x16  &')    # create virtual display with size 1600x1200 and 16 bit color. Color can be changed to 24 or 8
@@ -27,7 +24,7 @@ from graph import Graph
 from model_evaluator import ModelEvaluator
 
 
-NUM_EXPERIMENTS = 2
+NUM_EXPERIMENTS = 10
 CONFIDENCE_LEVEL = 0.95
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -91,8 +88,9 @@ def plot(title, x_label, y_label, x, y, output_dir):
   plt.savefig(output_dir + title + ".png")
   plt.close()
 
-def run_train_once(logger: Logger, dataset, timesteps, degree_bins, model_args, split_graph, output_dir):
-  output_dir = output_dir + "/run_train_once/"
+def run_train_once(dataset, timesteps, degree_bins, model_args, split_graph, output_dir):
+  output_dir = output_dir + "run_train_once/"
+  logger = Logger(output_dir)
 
   logger.log("STARTED: run_train_once")
 
@@ -145,7 +143,7 @@ def run_train_once(logger: Logger, dataset, timesteps, degree_bins, model_args, 
     logger.log("Experiment {} started".format(experiment_num))
 
     # split graph
-    graphs = split_graph(data)
+    graphs = split_graph(data, timesteps)
 
     for graph in graphs:
       plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes, output_dir)
@@ -218,8 +216,9 @@ def run_train_once(logger: Logger, dataset, timesteps, degree_bins, model_args, 
   nd_weighted_cp_evaluator.save_results()
   embedding_weighted_cp_evaluator.save_results()
 
-def run_train_every_timestep(logger, dataset, timesteps, degree_bins, model_args, split_graph, output_dir):
-  output_dir = output_dir + "/run_train_every_timestep/"
+def run_train_every_timestep(dataset, timesteps, degree_bins, model_args, split_graph, output_dir):
+  output_dir = output_dir + "run_train_every_timestep/"
+  logger = Logger(output_dir)
 
   logger.log("STARTED: run_train_every_timestep")
 
@@ -267,33 +266,34 @@ def run_train_every_timestep(logger, dataset, timesteps, degree_bins, model_args
   nd_mcp_evaluators = []
   nd_weighted_cp_evaluators = []
   embedding_weighted_cp_evaluators = []
-  for model in models:
-    model_evaluator = ModelEvaluator("graphsage_model", timesteps, output_dir)  
+  for i, model in enumerate(models):
+    timestep = graphs[i].timestep
+    model_evaluator = ModelEvaluator(f"graphsage_model_{timestep}", timesteps, output_dir)  
     model_evaluators.append(model_evaluator)
     
-    icp_evaluator = ICPEvaluator("arxiv_icp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    icp_evaluator = ICPEvaluator(f"arxiv_icp_{timestep}", timesteps, output_dir, CONFIDENCE_LEVEL)
     icp_evaluators.append(icp_evaluator)
     
-    icp_with_resampling_evaluator = ICPWithResamplingEvaluator("arxiv_icp_with_resampling", timesteps, output_dir, CONFIDENCE_LEVEL)
+    icp_with_resampling_evaluator = ICPWithResamplingEvaluator(f"arxiv_icp_with_resampling_{timestep}", timesteps, output_dir, CONFIDENCE_LEVEL)
     icp_with_resampling_evaluators.append(icp_with_resampling_evaluator)
     
-    mcp_evaluator = MCPEvaluator("arxiv_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    mcp_evaluator = MCPEvaluator(f"arxiv_mcp_{timestep}", timesteps, output_dir, CONFIDENCE_LEVEL)
     mcp_evaluators.append(mcp_evaluator)
     
-    nd_mcp_evaluator = NodeDegreeMCPEvaluator("arxiv_node_degree_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    nd_mcp_evaluator = NodeDegreeMCPEvaluator(f"arxiv_node_degree_mcp_{timestep}", timesteps, output_dir, CONFIDENCE_LEVEL)
     nd_mcp_evaluators.append(nd_mcp_evaluator)
     
-    nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_node_degree_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator(f"arxiv_node_degree_weighted_cp_{timestep}", timesteps, output_dir, CONFIDENCE_LEVEL)
     nd_weighted_cp_evaluators.append(nd_weighted_cp_evaluator)
     
-    embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("arxiv_embedding_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator(f"arxiv_embedding_weighted_cp_{timestep}", timesteps, output_dir, CONFIDENCE_LEVEL)
     embedding_weighted_cp_evaluators.append(embedding_weighted_cp_evaluator)
   
   for experiment_num in range(NUM_EXPERIMENTS):
     logger.log("Experiment {} started".format(experiment_num))
 
     # split graph
-    graphs = split_graph(data)
+    graphs = split_graph(data, timesteps)
 
     for graph in graphs:
       plot_class_distribution(graph.timestep, graph.data.y.reshape(-1).detach().numpy(), dataset.num_classes, output_dir)
@@ -351,21 +351,23 @@ def run_train_every_timestep(logger, dataset, timesteps, degree_bins, model_args
 
       embedding_weighted_cp_evaluators[i].capture(model, embedding_weighted_cp, graphs)
 
+  # save evaluators results
+  for i, model_evaluator in enumerate(model_evaluators):
+      logger.log(f"saving results for model {i}")
+      model_evaluator.save_results()
+      icp_evaluators[i].save_results()
+      icp_with_resampling_evaluators[i].save_results()
+      mcp_evaluators[i].save_results()
+      nd_mcp_evaluators[i].save_results()
+      nd_weighted_cp_evaluators[i].save_results()
+      embedding_weighted_cp_evaluators[i].save_results()
+
   # save graphsage training time
-  save_training_time("graphsage_training", timesteps, graphsage_training_times, output_dir)
-
-  # plot model performance
-  model_evaluator.save_results()
-
-  # print cp performance
-  icp_evaluator.save_results()
-  icp_with_resampling_evaluator.save_results()
-  mcp_evaluator.save_results()
-  nd_mcp_evaluator.save_results()
-  nd_weighted_cp_evaluator.save_results()
-  embedding_weighted_cp_evaluator.save_results()
+  logger.log("graphsage training times: {}".format(graphsage_training_times))
+  save_training_time("graphsage_training_time", timesteps, graphsage_training_times, output_dir)
 
 def run_arxiv():
+  output_dir = f"output/arxiv/{int(time.time())}/"
   logger = Logger(output_dir)
 
   logger.log("========ARXIV EXPERIMENT========")
@@ -374,8 +376,8 @@ def run_arxiv():
   dataset = PygNodePropPredDataset(name="ogbn-arxiv")
 
   # arxiv specific
-  timesteps = [2010, 2015, 2020]
-  degree_bins = torch.tensor([0,1,5,10,20,100]) # boundaries[i-1] < input[x] <= boundaries[i]
+  timesteps = [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
+  degree_bins = torch.tensor([0,5,10,20]) # boundaries[i-1] < input[x] <= boundaries[i]
   model_args = {
       "num_layers": 3,
       "hidden_dim": 256,
@@ -384,12 +386,11 @@ def run_arxiv():
       "num_classes": dataset.num_classes,
       "num_features": dataset[0].num_features,
   }
-  output_dir = "output/arxiv/" + int(time.time())
 
   logger.log("Config\n\ttimesteps: {}\n\tdegree_bins: {}\n\tmodel_args: {}\n\toutput_dir: {}".format(timesteps, degree_bins, model_args, output_dir))
 
-  run_train_once(logger, dataset, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
-  run_train_every_timestep(logger, dataset, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
+  run_train_once(dataset, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
+  run_train_every_timestep(dataset, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
 
 # run experiments
 run_arxiv()
