@@ -58,3 +58,9 @@ Download from VM:
 ```
 scp -i .ssh/id_ed25519 -r ubuntu@130.61.254.191:msc_thesis_code/1_dynamic_experiments/output Downloads/arxiv_output
 ```
+
+Start command in background:
+```
+nohup python3 experiments.py &
+exit
+```
