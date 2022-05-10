@@ -11,7 +11,7 @@ import time
 from tabulate import tabulate
 import matplotlib.pyplot as plt
 from lib.data import split, split_dataset
-from lib.graphsage import GraphSAGE
+from lib.graphsage import GraphSAGEWithSampling
 from lib import evaluation
 from lib.logger import Logger
 from ogb.nodeproppred import PygNodePropPredDataset
@@ -51,7 +51,7 @@ def split_arxiv_graph(data, years):
     return graphs
 
 
-def split_reddit_graph(data):
+def split_reddit_graph(data, timesteps):
     graphs = []
 
     # timestep 1
@@ -76,7 +76,7 @@ def split_reddit_graph(data):
     return graphs
 
 
-def split_bitcoin_graph(data):
+def split_bitcoin_graph(data, timesteps):
     time_steps = torch.unique(data.time_steps)
 
     graphs = []
@@ -149,8 +149,8 @@ def load_bitcoin_graph():
 
 
 def train_model(graph: Graph, model_args):
-    model = GraphSAGE(model_args["num_features"], model_args["hidden_dim"],
-                      model_args["num_classes"], model_args["num_layers"]).to(DEVICE)
+    model = GraphSAGEWithSampling(model_args["num_features"], model_args["hidden_dim"],
+                      model_args["num_classes"], model_args["num_layers"], [100,10,5]).to(DEVICE)
 
     # reset the parameters to initial random value
     model.reset_parameters()
@@ -159,8 +159,9 @@ def train_model(graph: Graph, model_args):
 
     loss_fn = torch.nn.NLLLoss()
 
-    for _ in range(1, 1 + model_args["epochs"]):
-        model.train_model(graph.train_data, optimizer, loss_fn)
+    for epoch in range(1, 1 + model_args["epochs"]):
+        print(f"Epoch: {epoch}")
+        model.train_model(graph.train_data, optimizer, loss_fn, 100000)
 
     return model
 
@@ -279,7 +280,7 @@ def run_train_once(data, num_classes, timesteps, degree_bins, model_args, split_
         y_hat = model.predict(first_snapshot.data)
         y_hat = y_hat[first_snapshot.calibration_indices]
 
-        y_true = data.y[first_snapshot.calibration_indices]
+        y_true = first_snapshot.data.y[first_snapshot.calibration_indices]
         y_true = y_true.reshape(-1).detach()
 
         icp = create_icp(y_hat, y_true, num_classes)
@@ -449,7 +450,7 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
             y_hat = model.predict(graph.data)
             y_hat = y_hat[graph.calibration_indices]
 
-            y_true = data.y[graph.calibration_indices]
+            y_true = graph.data.y[graph.calibration_indices]
             y_true = y_true.reshape(-1).detach()
 
             icp = create_icp(y_hat, y_true, num_classes)
@@ -572,9 +573,9 @@ def run_reddit():
         timesteps, degree_bins, model_args, output_dir))
 
     run_train_once(data, num_classes, timesteps, degree_bins,
-                   model_args, split_arxiv_graph, output_dir)
+                   model_args, split_reddit_graph, output_dir)
     run_train_every_timestep(
-        data, num_classes, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
+        data, num_classes, timesteps, degree_bins, model_args, split_reddit_graph, output_dir)
 
 
 def run_bitcoin():
@@ -603,12 +604,12 @@ def run_bitcoin():
         timesteps, degree_bins, model_args, output_dir))
 
     run_train_once(data, data.num_classes, timesteps, degree_bins,
-                   model_args, split_arxiv_graph, output_dir)
+                   model_args, split_bitcoin_graph, output_dir)
     run_train_every_timestep(
-        data, data.num_classes, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
+        data, data.num_classes, timesteps, degree_bins, model_args, split_bitcoin_graph, output_dir)
 
 
 # run experiments
-run_arxiv()
+# run_arxiv()
 run_reddit()
 run_bitcoin()

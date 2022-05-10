@@ -55,7 +55,7 @@ class ModelEvaluator(object):
     macro_f1_std.extend(np.std(np.array(self.macro_f1_scores), axis=0).tolist())
     
     scores = [accuracy_avg, accuracy_std, macro_f1_avg, macro_f1_std]
-    self._save_results("results_{}_performance.txt".format(self.title), tabulate(scores, headers=self.timesteps))
+    self._save_results("results_{}_performance.txt".format(self.title), tabulate(scores, headers=self.timesteps, tablefmt="tsv"))
   
   def _save_results(self, file, str):
     try:

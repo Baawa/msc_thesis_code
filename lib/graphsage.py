@@ -68,8 +68,6 @@ class GraphSAGEWithSampling(torch.nn.Module):
 
         loss.backward()
         optimizer.step()
-
-    return loss.item()
   
   def predict(self, data):
     self.eval()
@@ -151,8 +149,6 @@ class GraphSAGE(torch.nn.Module):
 
     loss.backward()
     optimizer.step()
-
-    return loss.item()
   
   def predict(self, data):
     self.eval()
