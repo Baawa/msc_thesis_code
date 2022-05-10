@@ -11,7 +11,7 @@ import time
 from tabulate import tabulate
 import matplotlib.pyplot as plt
 from lib.data import split, split_dataset
-from lib.graphsage import GraphSAGEWithSampling
+from lib.graphsage import GraphSAGEWithSampling, GraphSAGE
 from lib import evaluation
 from lib.logger import Logger
 from ogb.nodeproppred import PygNodePropPredDataset
@@ -149,8 +149,10 @@ def load_bitcoin_graph():
 
 
 def train_model(graph: Graph, model_args):
-    model = GraphSAGEWithSampling(model_args["num_features"], model_args["hidden_dim"],
-                      model_args["num_classes"], model_args["num_layers"], [100,10,5]).to(DEVICE)
+    if model_args["use_sampling"] == True:
+        model = GraphSAGEWithSampling(model_args["num_features"], model_args["hidden_dim"], model_args["num_classes"], model_args["num_layers"], model_args["sampling_size"], model_args["batch_size"]).to(DEVICE)
+    else:
+        model = GraphSAGE(model_args["num_features"], model_args["hidden_dim"], model_args["num_classes"], model_args["num_layers"]).to(DEVICE)
 
     # reset the parameters to initial random value
     model.reset_parameters()
@@ -161,10 +163,9 @@ def train_model(graph: Graph, model_args):
 
     for epoch in range(1, 1 + model_args["epochs"]):
         print(f"Epoch: {epoch}")
-        model.train_model(graph.train_data, optimizer, loss_fn, 100000)
-
+        model.train_model(graph.train_data, optimizer, loss_fn)
+    
     return model
-
 
 def save_results(output_dir, file, str):
     try:
@@ -243,18 +244,12 @@ def run_train_once(data, num_classes, timesteps, degree_bins, model_args, split_
 
     model_evaluator = ModelEvaluator("graphsage_model", timesteps, output_dir)
 
-    icp_evaluator = ICPEvaluator(
-        "arxiv_icp", timesteps, output_dir, CONFIDENCE_LEVEL)
-    icp_with_resampling_evaluator = ICPWithResamplingEvaluator(
-        "arxiv_icp_with_resampling", timesteps, output_dir, CONFIDENCE_LEVEL)
-    mcp_evaluator = MCPEvaluator(
-        "arxiv_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
-    nd_mcp_evaluator = NodeDegreeMCPEvaluator(
-        "arxiv_node_degree_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
-    nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator(
-        "arxiv_node_degree_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
-    embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator(
-        "arxiv_embedding_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    icp_evaluator = ICPEvaluator("icp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    icp_with_resampling_evaluator = ICPWithResamplingEvaluator("icp_with_resampling", timesteps, output_dir, CONFIDENCE_LEVEL)
+    mcp_evaluator = MCPEvaluator("mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    nd_mcp_evaluator = NodeDegreeMCPEvaluator("node_degree_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("node_degree_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("embedding_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
 
     for experiment_num in range(NUM_EXPERIMENTS):
         logger.log("Experiment {} started".format(experiment_num))
@@ -271,60 +266,63 @@ def run_train_once(data, num_classes, timesteps, degree_bins, model_args, split_
 
         first_snapshot = graphs[0]
 
-        # capture model performance
-        model_evaluator.capture(model, graphs)
+        for graph in graphs:
+            # capture model performance
+            model_evaluator.capture(model, graph)
 
-        # ICP
-        logger.log("running ICP")
+            # ICP
+            logger.log("running ICP")
 
-        y_hat = model.predict(first_snapshot.data)
-        y_hat = y_hat[first_snapshot.calibration_indices]
+            y_hat = model.predict(first_snapshot.data)
+            y_hat = y_hat[first_snapshot.calibration_indices]
 
-        y_true = first_snapshot.data.y[first_snapshot.calibration_indices]
-        y_true = y_true.reshape(-1).detach()
+            y_true = first_snapshot.data.y[first_snapshot.calibration_indices]
+            y_true = y_true.reshape(-1).detach()
 
-        icp = create_icp(y_hat, y_true, num_classes)
+            icp = create_icp(y_hat, y_true, num_classes)
 
-        icp_evaluator.capture(model, icp, graphs)
+            icp_evaluator.capture(model, icp, graph)
 
-        # ICP with resampling
-        logger.log("running ICP with resampling")
+            # ICP with resampling
+            logger.log("running ICP with resampling")
 
-        icp_with_resampling_evaluator.capture(
-            model, graphs, num_classes)
+            icp_with_resampling_evaluator.capture(model, graph, num_classes)
 
-        # MCP
-        logger.log("running MCP")
+            # MCP
+            logger.log("running MCP")
 
-        mcp = create_mcp(model, first_snapshot.data,
-                         first_snapshot.calibration_indices)
+            mcp = create_mcp(model, first_snapshot.data, first_snapshot.calibration_indices)
 
-        mcp_evaluator.capture(model, mcp, graphs)
+            mcp_evaluator.capture(model, mcp, graph)
 
-        # Node degree MCP
-        logger.log("running node degree MCP")
+            # Node degree MCP
+            logger.log("running node degree MCP")
 
-        nd_mcp = create_node_degree_mcp(
-            model, first_snapshot.data, first_snapshot.calibration_indices, degree_bins)
+            nd_mcp = create_node_degree_mcp(model, first_snapshot.data, first_snapshot.calibration_indices, degree_bins)
 
-        nd_mcp_evaluator.capture(model, nd_mcp, graphs, degree_bins)
+            nd_mcp_evaluator.capture(model, nd_mcp, graph, degree_bins)
 
-        # Node degree weighted CP
-        logger.log("running node degree weighted CP")
+            # Node degree weighted CP
+            logger.log("running node degree weighted CP")
 
-        nd_weighted_cp = create_node_degree_weighted_cp(
-            model, first_snapshot.data, first_snapshot.calibration_indices)
+            nd_weighted_cp = create_node_degree_weighted_cp(model, first_snapshot.data, first_snapshot.calibration_indices)
 
-        nd_weighted_cp_evaluator.capture(model, nd_weighted_cp, graphs)
+            nd_weighted_cp_evaluator.capture(model, nd_weighted_cp, graph)
 
-        # Embedding weighted CP
-        logger.log("running embedding weighted CP")
+            # Embedding weighted CP
+            logger.log("running embedding weighted CP")
 
-        embedding_weighted_cp = create_embedding_weighted_cp(
-            model, first_snapshot.data, first_snapshot.calibration_indices)
+            embedding_weighted_cp = create_embedding_weighted_cp(model, first_snapshot.data, first_snapshot.calibration_indices)
 
-        embedding_weighted_cp_evaluator.capture(
-            model, embedding_weighted_cp, graphs)
+            embedding_weighted_cp_evaluator.capture(model, embedding_weighted_cp, graph)
+        
+        model_evaluator.new_batch()
+        icp_evaluator.new_batch()
+        icp_with_resampling_evaluator.new_batch()
+        mcp_evaluator.new_batch()
+        nd_mcp_evaluator.new_batch()
+        nd_weighted_cp_evaluator.new_batch()
+        embedding_weighted_cp_evaluator.new_batch()
 
     # save graphsage training time
     save_training_time("graphsage_training", timesteps, [
@@ -386,44 +384,15 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
 
         logger.log(
             f"Finished training GraphSAGE model with accuracy {100 * acc:.2f}% and macro avg f1 score: {100 * macro_f1:.2f}% for timestep: {graph.timestep}")
+    
+    model_evaluator = ModelEvaluator("graphsage_model", timesteps, output_dir)
 
-    model_evaluators = []
-    icp_evaluators = []
-    icp_with_resampling_evaluators = []
-    mcp_evaluators = []
-    nd_mcp_evaluators = []
-    nd_weighted_cp_evaluators = []
-    embedding_weighted_cp_evaluators = []
-    for i, model in enumerate(models):
-        timestep = graphs[i].timestep
-        model_evaluator = ModelEvaluator(
-            f"graphsage_model_{timestep}", [timestep], output_dir)
-        model_evaluators.append(model_evaluator)
-
-        icp_evaluator = ICPEvaluator(
-            f"arxiv_icp_{timestep}", [timestep], output_dir, CONFIDENCE_LEVEL)
-        icp_evaluators.append(icp_evaluator)
-
-        icp_with_resampling_evaluator = ICPWithResamplingEvaluator(
-            f"arxiv_icp_with_resampling_{timestep}", [timestep], output_dir, CONFIDENCE_LEVEL)
-        icp_with_resampling_evaluators.append(icp_with_resampling_evaluator)
-
-        mcp_evaluator = MCPEvaluator(
-            f"arxiv_mcp_{timestep}", [timestep], output_dir, CONFIDENCE_LEVEL)
-        mcp_evaluators.append(mcp_evaluator)
-
-        nd_mcp_evaluator = NodeDegreeMCPEvaluator(
-            f"arxiv_node_degree_mcp_{timestep}", [timestep], output_dir, CONFIDENCE_LEVEL)
-        nd_mcp_evaluators.append(nd_mcp_evaluator)
-
-        nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator(
-            f"arxiv_node_degree_weighted_cp_{timestep}", [timestep], output_dir, CONFIDENCE_LEVEL)
-        nd_weighted_cp_evaluators.append(nd_weighted_cp_evaluator)
-
-        embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator(
-            f"arxiv_embedding_weighted_cp_{timestep}", [timestep], output_dir, CONFIDENCE_LEVEL)
-        embedding_weighted_cp_evaluators.append(
-            embedding_weighted_cp_evaluator)
+    icp_evaluator = ICPEvaluator("icp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    icp_with_resampling_evaluator = ICPWithResamplingEvaluator("icp_with_resampling", timesteps, output_dir, CONFIDENCE_LEVEL)
+    mcp_evaluator = MCPEvaluator("mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    nd_mcp_evaluator = NodeDegreeMCPEvaluator("node_degree_mcp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("node_degree_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
+    embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("embedding_weighted_cp", timesteps, output_dir, CONFIDENCE_LEVEL)
 
     for experiment_num in range(NUM_EXPERIMENTS):
         logger.log("Experiment {} started".format(experiment_num))
@@ -442,7 +411,7 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
             graph = graphs[i]
             
             # capture model performance
-            model_evaluators[i].capture(model, [graph])
+            model_evaluator.capture(model, [graph])
 
             # ICP
             logger.log("running ICP")
@@ -455,12 +424,12 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
 
             icp = create_icp(y_hat, y_true, num_classes)
 
-            icp_evaluators[i].capture(model, icp, [graph])
+            icp_evaluator.capture(model, icp, [graph])
 
             # ICP with resampling
             logger.log("running ICP with resampling")
 
-            icp_with_resampling_evaluators[i].capture(model, [graph], num_classes)
+            icp_with_resampling_evaluator.capture(model, [graph], num_classes)
 
             # MCP
             logger.log("running MCP")
@@ -468,7 +437,7 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
             mcp = create_mcp(
                 model, graph.data, graph.calibration_indices)
 
-            mcp_evaluators[i].capture(model, mcp, [graph])
+            mcp_evaluator.capture(model, mcp, [graph])
 
             # Node degree MCP
             logger.log("running node degree MCP")
@@ -476,7 +445,7 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
             nd_mcp = create_node_degree_mcp(
                 model, graph.data, graph.calibration_indices, degree_bins)
 
-            nd_mcp_evaluators[i].capture(model, nd_mcp, [graph], degree_bins)
+            nd_mcp_evaluator.capture(model, nd_mcp, [graph], degree_bins)
 
             # Node degree weighted CP
             logger.log("running node degree weighted CP")
@@ -484,7 +453,7 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
             nd_weighted_cp = create_node_degree_weighted_cp(
                 model, graph.data, graph.calibration_indices)
 
-            nd_weighted_cp_evaluators[i].capture(model, nd_weighted_cp, [graph])
+            nd_weighted_cp_evaluator.capture(model, nd_weighted_cp, [graph])
 
             # Embedding weighted CP
             logger.log("running embedding weighted CP")
@@ -492,24 +461,28 @@ def run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_ar
             embedding_weighted_cp = create_embedding_weighted_cp(
                 model, graph.data, graph.calibration_indices)
 
-            embedding_weighted_cp_evaluators[i].capture(model, embedding_weighted_cp, [graph])
+            embedding_weighted_cp_evaluator.capture(model, embedding_weighted_cp, [graph])
+        
+        model_evaluator.new_batch()
+        icp_evaluator.new_batch()
+        icp_with_resampling_evaluator.new_batch()
+        mcp_evaluator.new_batch()
+        nd_mcp_evaluator.new_batch()
+        nd_weighted_cp_evaluator.new_batch()
+        embedding_weighted_cp_evaluator.new_batch()
 
     # save evaluators results
-    for i, model_evaluator in enumerate(model_evaluators):
-        logger.log(f"saving results for model {i}")
-        model_evaluator.save_results()
-        icp_evaluators[i].save_results()
-        icp_with_resampling_evaluators[i].save_results()
-        mcp_evaluators[i].save_results()
-        nd_mcp_evaluators[i].save_results()
-        nd_weighted_cp_evaluators[i].save_results()
-        embedding_weighted_cp_evaluators[i].save_results()
+    model_evaluator.save_results()
+    icp_evaluator.save_results()
+    icp_with_resampling_evaluator.save_results()
+    mcp_evaluator.save_results()
+    nd_mcp_evaluator.save_results()
+    nd_weighted_cp_evaluator.save_results()
+    embedding_weighted_cp_evaluator.save_results()
 
     # save graphsage training time
-    logger.log("graphsage training times: {}".format(
-        graphsage_training_times))
-    save_training_time("graphsage_training_time", timesteps,
-                       graphsage_training_times, output_dir)
+    logger.log("graphsage training times: {}".format(graphsage_training_times))
+    save_training_time("graphsage_training_time", timesteps, graphsage_training_times, output_dir)
 
 
 def run_arxiv():
@@ -529,6 +502,7 @@ def run_arxiv():
     # boundaries[i-1] < input[x] <= boundaries[i]
     degree_bins = torch.tensor([0, 5, 10, 20])
     model_args = {
+        "use_sampling": False,
         "num_layers": 3,
         "hidden_dim": 256,
         "lr": 0.01,  # learning rate
@@ -561,10 +535,13 @@ def run_reddit():
     # boundaries[i-1] < input[x] <= boundaries[i]
     degree_bins = torch.tensor([0, 5, 10, 20])
     model_args = {
+        "use_sampling": True,
+        "batch_size": 10000,
+        "sampling_size": [100, 10, 5],
         "num_layers": 3,
         "hidden_dim": 256,
         "lr": 0.01,  # learning rate
-        "epochs": 200,
+        "epochs": 100,
         "num_classes": num_classes,
         "num_features": data.num_features,
     }
@@ -590,10 +567,11 @@ def run_bitcoin():
     # boundaries[i-1] < input[x] <= boundaries[i]
     degree_bins = torch.tensor([0, 5, 10, 20])
     model_args = {
+        "use_sampling": False,
         "num_layers": 3,
         "hidden_dim": 256,
         "lr": 0.01,  # learning rate
-        "epochs": 200,
+        "epochs": 50,
         "num_classes": data.num_classes,
         "num_features": data.num_features,
     }

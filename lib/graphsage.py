@@ -3,7 +3,7 @@ from torch_geometric.nn import SAGEConv
 from torch_geometric.loader import NeighborLoader
 
 class GraphSAGEWithSampling(torch.nn.Module):
-  def __init__(self, input_dim, hidden_dim, output_dim, num_layers, sampling_size):
+  def __init__(self, input_dim, hidden_dim, output_dim, num_layers, sampling_size, batch_size):
     """
       sampling_size: number of neighbors to sample at each layer (list[int]).
     """
@@ -29,6 +29,7 @@ class GraphSAGEWithSampling(torch.nn.Module):
       raise ValueError("Invalid sampling_size. Expected list to be as long as num_layers")
 
     self.sampling_size = sampling_size
+    self.batch_size = batch_size
 
     self.return_embeds = False
 
@@ -52,10 +53,10 @@ class GraphSAGEWithSampling(torch.nn.Module):
 
     return node_class
 
-  def train_model(self, data, optimizer, loss_fn, batch_size):
+  def train_model(self, data, optimizer, loss_fn):
     self.train()
 
-    loader = NeighborLoader(data, batch_size=batch_size, num_neighbors=self.sampling_size)
+    loader = NeighborLoader(data, batch_size=self.batch_size, num_neighbors=self.sampling_size)
 
     for batch in loader:
         optimizer.zero_grad()
@@ -72,7 +73,7 @@ class GraphSAGEWithSampling(torch.nn.Module):
   def predict(self, data):
     self.eval()
     
-    loader = NeighborLoader(data, num_neighbors=self.sampling_size, batch_size=data.x.shape[0])
+    loader = NeighborLoader(data, num_neighbors=self.sampling_size, batch_size=self.batch_size)
 
     y_hat = []
     for batch in loader:

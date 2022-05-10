@@ -10,34 +10,35 @@ class ModelEvaluator(object):
     self.title = title
     self.timesteps = timesteps
     self.output_dir = output_dir
+    self.batch_accuracy_scores = []
+    self.batch_macro_f1_scores = []
     self.accuracy_scores = []
     self.macro_f1_scores = []
     self.prediction_times = []
   
-  def capture(self, model, graphs:"list[Graph]"):
-    accuracy_scores = []
-    macro_f1_scores = []
+  def new_batch(self):
+    self.accuracy_scores.append(self.batch_accuracy_scores)
+    self.macro_f1_scores.append(self.batch_macro_f1_scores)
+    self.batch_accuracy_scores = []
+    self.batch_macro_f1_scores = []
+  
+  def capture(self, model, graph: Graph):
+    start_time = time.time()
 
-    for graph in graphs:
-      start_time = time.time()
-
-      y_hat = model.predict(graph.data)
-      
-      num_predictions = y_hat.shape[0]
-      prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-      self.prediction_times.append(prediction_time)
-      
-      y_hat = y_hat[graph.test_indices]
-      y_hat = y_hat.argmax(dim=-1, keepdim=True).reshape(-1).detach().cpu()
-
-      y_true = graph.data.y[graph.test_indices].reshape(-1).detach().cpu()
-
-      acc, macro_f1 = get_multiclass_classification_performance(y_hat, y_true)
-      accuracy_scores.append(acc)
-      macro_f1_scores.append(macro_f1)
+    y_hat = model.predict(graph.data)
     
-    self.accuracy_scores.append(accuracy_scores)
-    self.macro_f1_scores.append(macro_f1_scores)
+    num_predictions = y_hat.shape[0]
+    prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
+    self.prediction_times.append(prediction_time)
+    
+    y_hat = y_hat[graph.test_indices]
+    y_hat = y_hat.argmax(dim=-1, keepdim=True).reshape(-1).detach().cpu()
+
+    y_true = graph.data.y[graph.test_indices].reshape(-1).detach().cpu()
+
+    acc, macro_f1 = get_multiclass_classification_performance(y_hat, y_true)
+    self.batch_accuracy_scores.append(acc)
+    self.batch_macro_f1_scores.append(macro_f1)
 
   def save_results(self):
     time_avg = np.mean(self.prediction_times)
