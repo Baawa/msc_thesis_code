@@ -75,12 +75,24 @@ class GraphSAGEWithSampling(torch.nn.Module):
     
     loader = NeighborLoader(data, num_neighbors=self.sampling_size, batch_size=self.batch_size)
 
-    y_hat = []
     for batch in loader:
-      out = self(batch.x, batch.edge_index)
-      y_hat.extend(out.tolist())
+      if self.return_embeds == True:
+        y_hat, embeddings = self(batch.x, batch.edge_index)
+      else:
+        y_hat = self(batch.x, batch.edge_index)
+      if res_y_hat == None:
+        res_y_hat = y_hat
+      else:
+        res_y_hat = torch.cat([res_y_hat, y_hat], dim=0)
+      if self.return_embeds == True:
+        if res_embeddings == None:
+          res_embeddings = embeddings
+        else:
+          res_embeddings = torch.cat([res_embeddings, embeddings], dim=0)
+    if self.return_embeds == True:
+      return res_y_hat, res_embeddings
     
-    return torch.tensor(y_hat)
+    return res_y_hat
   
   def set_return_embeds(self, return_embeds: bool):
     self.return_embeds = return_embeds
