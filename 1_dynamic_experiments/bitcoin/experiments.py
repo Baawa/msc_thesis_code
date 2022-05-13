@@ -460,7 +460,7 @@ def run_bitcoin():
         "num_features": data.num_features,
     }
 
-    timesteps = torch.unique(data.y).tolist()
+    timesteps = torch.unique(data.time_steps).tolist()
 
     logger.log("Config\n\ttimesteps: {}\n\tdegree_bins: {}\n\tmodel_args: {}\n\toutput_dir: {}".format(
         timesteps, degree_bins, model_args, output_dir))
