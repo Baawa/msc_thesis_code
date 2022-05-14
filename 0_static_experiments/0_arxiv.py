@@ -112,7 +112,7 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
         logger.log("Experiment {} started".format(experiment_num))
 
         # split data set
-        _, calibration_indices, test_indices = split_dataset(data, test_frac=0.2, calibration_frac=0.2)
+        _, calibration_indices, test_indices = split_dataset(data.cpu(), test_frac=0.2, calibration_frac=0.2)
 
         graph = Graph(1, data, train_data, calibration_indices, test_indices)
         
