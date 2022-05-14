@@ -14,8 +14,8 @@ from data import split, split_dataset
 from graphsage import GraphSAGEWithSampling, GraphSAGE
 import evaluation
 from logger import Logger
-from ogb.nodeproppred import PygNodePropPredDataset
 import torch
+import numpy as np
 
 from torch_geometric.datasets import Reddit
 
@@ -37,6 +37,9 @@ def split_reddit_graph(data, timesteps):
     # timestep 1
     timestep1_indices = torch.nonzero(data.train_mask).reshape(-1).tolist()
     timestep1_data = split(data, timestep1_indices)
+    # sample 70% of nodes
+    sampled_indices = np.random.choice(timestep1_data.num_nodes, int(timestep1_data.num_nodes * 0.7), replace=False).tolist()
+    timestep1_data = split(timestep1_data, sampled_indices)
 
     train_data, calibration_indices, test_indices = split_dataset(
         timestep1_data, test_frac=0.2, calibration_frac=0.2)
@@ -47,6 +50,9 @@ def split_reddit_graph(data, timesteps):
     timestep2_indices = torch.cat([torch.nonzero(
         data.test_mask), torch.nonzero(data.val_mask)]).reshape(-1).tolist()
     timestep2_data = split(data, timestep2_indices)
+    # sample 70% of nodes
+    sampled_indices = np.random.choice(timestep2_data.num_nodes, int(timestep2_data.num_nodes * 0.7), replace=False).tolist()
+    timestep2_data = split(timestep2_data, sampled_indices)
 
     train_data, calibration_indices, test_indices = split_dataset(
         timestep2_data, test_frac=0.2, calibration_frac=0.2)
