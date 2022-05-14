@@ -1,3 +1,4 @@
+import os
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -5,7 +6,7 @@ import itertools
 
 matplotlib.rcParams['lines.linewidth'] = 4
 matplotlib.rcParams['lines.markersize'] = 14
-matplotlib.rcParams['figure.figsize'] = [40, 12]
+matplotlib.rcParams['figure.figsize'] = [30, 12]
 font = {'size': 20}
 matplotlib.rc('font', **font)
 alpha = 1
@@ -62,11 +63,14 @@ def plot(index, title, ymin=0, ymax=1):
   plt.grid(True)
 
   # plt.savefig(f"plots/{title}.png", bbox_inches='tight')
-  plt.savefig(f"plots/{title}.png")
+  plt.tight_layout()
+  output_dir = "plots"
+  os.makedirs(output_dir, exist_ok=True)
+  plt.savefig(f"{output_dir}/{title}.png")
   plt.close()
   # plt.show()
 
-plot(1, "Coverage - OGB Arxiv - Train every time step", ymin=0.8, ymax=1)
-plot(3, "Average Prediction Set Size - OGB Arxiv - Train every time step", ymin=0, ymax=10)
-plot(5, "Singleton Predictions - OGB Arxiv - Train every time step", ymin=0, ymax=1)
-plot(6, "Empty Predictions - OGB Arxiv - Train every time step", ymin=0, ymax=0.1)
+plot(1, "Coverage - Bitcoin Elliptic - Train once", ymin=0.2, ymax=1)
+plot(3, "Average Prediction Set Size - Bitcoin Elliptic - Train once", ymin=0, ymax=2)
+plot(5, "Singleton Predictions - Bitcoin Elliptic - Train once", ymin=0, ymax=1)
+plot(6, "Empty Predictions - Bitcoin Elliptic - Train once", ymin=0, ymax=0.25)

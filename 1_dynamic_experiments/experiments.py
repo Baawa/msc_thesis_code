@@ -162,7 +162,6 @@ def train_model(graph: Graph, model_args):
     loss_fn = torch.nn.NLLLoss()
 
     for epoch in range(1, 1 + model_args["epochs"]):
-        print(f"Epoch: {epoch}")
         model.train_model(graph.train_data, optimizer, loss_fn)
     
     return model

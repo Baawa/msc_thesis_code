@@ -25,7 +25,8 @@ class ModelEvaluator(object):
   def capture(self, model, graph: Graph):
     start_time = time.time()
 
-    y_hat = model.predict(graph.data)
+    print(f"[modelevaluator] data is cuda: {graph.data.is_cuda}")
+    y_hat = model.predict(graph.data.cuda())
     
     num_predictions = y_hat.shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)

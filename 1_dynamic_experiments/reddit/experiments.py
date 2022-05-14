@@ -33,12 +33,13 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def split_reddit_graph(data, timesteps):
     graphs = []
+    sample_size = 0.3
 
     # timestep 1
     timestep1_indices = torch.nonzero(data.train_mask).reshape(-1).tolist()
     timestep1_data = split(data, timestep1_indices)
-    # sample 70% of nodes
-    sampled_indices = np.random.choice(timestep1_data.num_nodes, int(timestep1_data.num_nodes * 0.7), replace=False).tolist()
+    # sample X% of nodes
+    sampled_indices = np.random.choice(timestep1_data.num_nodes, int(timestep1_data.num_nodes * sample_size), replace=False).tolist()
     timestep1_data = split(timestep1_data, sampled_indices)
 
     train_data, calibration_indices, test_indices = split_dataset(
@@ -46,18 +47,13 @@ def split_reddit_graph(data, timesteps):
     graphs.append(Graph(1, timestep1_data, train_data,
                   calibration_indices, test_indices))
 
-    # timestep 2
-    timestep2_indices = torch.cat([torch.nonzero(
-        data.test_mask), torch.nonzero(data.val_mask)]).reshape(-1).tolist()
-    timestep2_data = split(data, timestep2_indices)
-    # sample 70% of nodes
-    sampled_indices = np.random.choice(timestep2_data.num_nodes, int(timestep2_data.num_nodes * 0.7), replace=False).tolist()
-    timestep2_data = split(timestep2_data, sampled_indices)
+    # timestep 2 (all nodes)
+    # sample X% of nodes
+    sampled_indices = np.random.choice(data.num_nodes, int(data.num_nodes * sample_size), replace=False).tolist()
+    timestep2_data = split(data, sampled_indices)
 
-    train_data, calibration_indices, test_indices = split_dataset(
-        timestep2_data, test_frac=0.2, calibration_frac=0.2)
-    graphs.append(Graph(2, timestep2_data, train_data,
-                  calibration_indices, test_indices))
+    train_data, calibration_indices, test_indices = split_dataset(timestep2_data, test_frac=0.2, calibration_frac=0.2)
+    graphs.append(Graph(2, timestep2_data, train_data, calibration_indices, test_indices))
 
     return graphs
 
@@ -75,7 +71,6 @@ def train_model(graph: Graph, model_args):
     loss_fn = torch.nn.NLLLoss()
 
     for epoch in range(1, 1 + model_args["epochs"]):
-        print(f"Epoch: {epoch}")
         model.train_model(graph.train_data, optimizer, loss_fn)
     
     return model

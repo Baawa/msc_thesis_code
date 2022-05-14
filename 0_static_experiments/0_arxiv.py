@@ -39,7 +39,6 @@ def train_model(train_data, model_args):
     loss_fn = torch.nn.NLLLoss()
 
     for epoch in range(1, 1 + model_args["epochs"]):
-        print(f"Epoch: {epoch}")
         model.train_model(train_data, optimizer, loss_fn)
     
     return model
@@ -114,7 +113,8 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
         # split data set
         _, calibration_indices, test_indices = split_dataset(data.cpu(), test_frac=0.2, calibration_frac=0.2)
 
-        graph = Graph(1, data, train_data, calibration_indices, test_indices)
+        print(f"data is cuda: {data.is_cuda}")
+        graph = Graph(1, data.to(DEVICE), train_data, calibration_indices, test_indices)
         
         # capture model performance
         model_evaluator.capture(model, graph)
