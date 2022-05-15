@@ -1,8 +1,4 @@
 import os
-import sys
-# module_path = os.path.abspath(os.path.join('../'))
-# if module_path not in sys.path:
-#     sys.path.append(module_path)
 
 from model_evaluator import ModelEvaluator
 from graph import Graph
@@ -33,7 +29,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def split_reddit_graph(data, timesteps):
     graphs = []
-    sample_size = 0.2
+    sample_size = 0.4
 
     # timestep 1
     timestep1_indices = torch.nonzero(data.train_mask).reshape(-1).tolist()
