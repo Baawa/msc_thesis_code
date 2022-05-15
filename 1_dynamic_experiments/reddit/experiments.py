@@ -414,7 +414,7 @@ def run_reddit():
         "num_layers": 2,
         "hidden_dim": 256,
         "lr": 0.01,  # learning rate
-        "epochs": 200,
+        "epochs": 1000,
         "num_classes": num_classes,
         "num_features": data.num_features,
     }
