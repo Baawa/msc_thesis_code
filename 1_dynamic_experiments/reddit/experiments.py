@@ -33,7 +33,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def split_reddit_graph(data, timesteps):
     graphs = []
-    sample_size = 0.25
+    sample_size = 0.1
 
     # timestep 1
     timestep1_indices = torch.nonzero(data.train_mask).reshape(-1).tolist()
@@ -405,7 +405,7 @@ def run_reddit():
     # boundaries[i-1] < input[x] <= boundaries[i]
     degree_bins = torch.tensor([0, 10, 100, 500])
     model_args = {
-        "use_sampling": True,
+        "use_sampling": False,
         "batch_size": 10000,
         "sampling_size": [50, 10],
         "num_layers": 2,
@@ -419,10 +419,8 @@ def run_reddit():
     logger.log("Config\n\ttimesteps: {}\n\tdegree_bins: {}\n\tmodel_args: {}\n\toutput_dir: {}".format(
         timesteps, degree_bins, model_args, output_dir))
 
-    run_train_once(data, num_classes, timesteps, degree_bins,
-                   model_args, split_reddit_graph, output_dir)
-    run_train_every_timestep(
-        data, num_classes, timesteps, degree_bins, model_args, split_reddit_graph, output_dir)
+    run_train_once(data, num_classes, timesteps, degree_bins, model_args, split_reddit_graph, output_dir)
+    run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_args, split_reddit_graph, output_dir)
 
 # run experiments
 run_reddit()

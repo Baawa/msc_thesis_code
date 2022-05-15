@@ -43,7 +43,7 @@ class ModelEvaluator(object):
   def save_results(self):
     time_avg = np.mean(self.prediction_times)
     time_std = np.std(self.prediction_times)
-    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg, time_std]], headers=["avg","std"]))
+    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg, time_std]], headers=["avg","std"], tablefmt="tsv"))
 
     accuracy_avg = ["accuracy avg"]
     accuracy_avg.extend(np.mean(np.array(self.accuracy_scores), axis=0).tolist())

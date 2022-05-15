@@ -36,7 +36,7 @@ class CPEvaluator(object):
   def save_results(self):
     time_avg = np.mean(self.prediction_times)
     time_std = np.std(self.prediction_times)
-    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg, time_std]], headers=["avg","std"]))
+    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg, time_std]], headers=["avg","std"], tablefmt="tsv"))
 
     coverage_avg = ["coverage avg"]
     coverage_avg.extend(np.mean(np.array(self.coverages), axis=0).tolist())

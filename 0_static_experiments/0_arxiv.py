@@ -62,8 +62,7 @@ def plot_class_distribution(ext, y, num_classes, output_dir):
 
 
 def save_training_time(prefix, times, output_dir):
-    save_results(output_dir, "{}_time.txt".format(
-        prefix), tabulate([times]))
+    save_results(output_dir, "{}_time.txt".format(prefix), tabulate([times], tablefmt="tsv"))
 
 
 def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir):
