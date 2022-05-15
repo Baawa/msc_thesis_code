@@ -168,8 +168,7 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
         embedding_weighted_cp_evaluator.new_batch()
 
     # save graphsage training time
-    save_training_time("graphsage_training", [1], [
-                       graphsage_training_time], output_dir)
+    save_training_time("graphsage_training", [graphsage_training_time], output_dir)
 
     # plot model performance
     model_evaluator.save_results()
