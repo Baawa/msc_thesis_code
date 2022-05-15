@@ -33,7 +33,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def split_reddit_graph(data, timesteps):
     graphs = []
-    sample_size = 0.1
+    sample_size = 0.2
 
     # timestep 1
     timestep1_indices = torch.nonzero(data.train_mask).reshape(-1).tolist()
