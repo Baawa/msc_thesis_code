@@ -2,18 +2,16 @@ import os
 
 from model_evaluator import ModelEvaluator
 from graph import Graph
-from cp_evaluators import ICPEvaluator, ICPWithResamplingEvaluator, create_icp, create_mcp, MCPEvaluator, NodeDegreeMCPEvaluator, create_node_degree_mcp, NodeDegreeWeightedCPEvaluator, create_node_degree_weighted_cp, EmbeddingWeightedCPEvaluator, create_embedding_weighted_cp
+from cp_evaluators import ICPEvaluator, create_icp, create_mcp, MCPEvaluator, NodeDegreeMCPEvaluator, create_node_degree_mcp, NodeDegreeWeightedCPEvaluator, create_node_degree_weighted_cp, EmbeddingWeightedCPEvaluator, create_embedding_weighted_cp
 import time
 from tabulate import tabulate
 import matplotlib.pyplot as plt
-from data import split, split_dataset
+from data import split_dataset
 from graphsage import GraphSAGEWithSampling, GraphSAGE
 import evaluation
 from logger import Logger
+from torch_geometric.datasets import Planetoid
 import torch
-
-import pandas as pd
-from torch_geometric.data import Data
 
 
 # special setting for plotting on ubuntu
@@ -27,61 +25,7 @@ NUM_EXPERIMENTS = 5
 CONFIDENCE_LEVEL = 0.95
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-
-def load_bitcoin_graph():
-    # target to torch tensor
-    target_df = pd.read_csv(
-        "dataset/elliptic_bitcoin_dataset/elliptic_txs_classes.csv")
-
-    # make class binary
-    target_df["class"] = target_df["class"].replace("unknown", "-1")
-    target_df["class"] = target_df["class"].replace("2", "0")
-    target_df["class"] = pd.to_numeric(target_df["class"])
-    target = torch.tensor(target_df["class"].values)
-
-    # node features to torch tensor
-    x_df = pd.read_csv(
-        "dataset/elliptic_bitcoin_dataset/elliptic_txs_features.csv", header=None)
-    id_df = x_df[0]
-    x_df = x_df.drop(columns=0)  # drop id column
-    timestep_df = x_df[1]
-    x_df = x_df.drop(columns=1)  # drop timestep column
-    x_tensor = torch.tensor(x_df.values).float()
-
-    # replace ids
-    id_df = pd.to_numeric(id_df)
-    id_df = id_df.reset_index()
-    id_df = id_df.rename(columns={"index": "New_ID"})
-    id_df = id_df.rename(columns={0: "Old_ID"})
-    id_dict = dict(zip(id_df["Old_ID"].values, id_df["New_ID"].values))
-
-    # edges to torch tensor
-    edges_df = pd.read_csv(
-        "dataset/elliptic_bitcoin_dataset/elliptic_txs_edgelist.csv")
-    edges_df["txId1"] = pd.to_numeric(edges_df["txId1"])
-    edges_df["txId2"] = pd.to_numeric(edges_df["txId2"])
-
-    # replace ids
-    edges_df["txId1"] = edges_df["txId1"].apply(lambda x: id_dict[x])
-    edges_df["txId2"] = edges_df["txId2"].apply(lambda x: id_dict[x])
-
-    edge_index = torch.LongTensor(
-        (edges_df["txId1"].values, edges_df["txId2"].values))
-
-    # timesteps
-    timesteps = torch.LongTensor(timestep_df.values)
-
-    # put together graph
-    data = Data(x=x_tensor, edge_index=edge_index, y=target)
-
-    data.num_classes = 2
-    data.num_features = x_tensor.shape[1]
-    data.time_steps = timesteps
-
-    return data
-
-
-def train_model(graph: Graph, model_args):
+def train_model(train_data, model_args):
     if model_args["use_sampling"] == True:
         model = GraphSAGEWithSampling(model_args["num_features"], model_args["hidden_dim"], model_args["num_classes"], model_args["num_layers"], model_args["sampling_size"], model_args["batch_size"]).to(DEVICE)
     else:
@@ -95,7 +39,7 @@ def train_model(graph: Graph, model_args):
     loss_fn = torch.nn.NLLLoss()
 
     for epoch in range(1, 1 + model_args["epochs"]):
-        model.train_model(graph.train_data, optimizer, loss_fn)
+        model.train_model(train_data, optimizer, loss_fn)
     
     return model
 
@@ -149,7 +93,7 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
 
     y_true = data.y[test_indices].reshape(-1)
 
-    acc, macro_f1 = evaluation.get_multiclass_classification_performance(y_hat[y_true != -1].detach().cpu(), y_true[y_true != -1].detach().cpu())
+    acc, macro_f1 = evaluation.get_multiclass_classification_performance(y_hat.detach().cpu(), y_true.detach().cpu())
 
     logger.log(
         f"Finished training GraphSAGE model with accuracy {100 * acc:.2f}% and macro avg f1 score: {100 * macro_f1:.2f}%")
@@ -168,7 +112,9 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
         # split data set
         _, calibration_indices, test_indices = split_dataset(data.cpu(), test_frac=0.2, calibration_frac=0.2)
 
+        print(f"data is cuda: {data.is_cuda}")
         graph = Graph(1, data.to(DEVICE), train_data, calibration_indices, test_indices)
+        print(f"data is cuda (2): {data.is_cuda}")
         
         # capture model performance
         model_evaluator.capture(model, graph)
@@ -182,7 +128,7 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
         y_true = data.y[calibration_indices]
         y_true = y_true.reshape(-1).detach()
 
-        icp = create_icp(y_hat[y_true != -1], y_true[y_true != -1], num_classes)
+        icp = create_icp(y_hat, y_true, num_classes)
 
         icp_evaluator.capture(model, icp, graph)
 
@@ -234,31 +180,35 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
     nd_weighted_cp_evaluator.save_results()
     embedding_weighted_cp_evaluator.save_results()
 
-def run_bitcoin():
-    output_dir = f"output/bitcoin/{int(time.time())}/"
+
+def run_arxiv():
+    output_dir = f"output/cora/{int(time.time())}/"
     logger = Logger(output_dir)
 
-    logger.log("========BITCOIN EXPERIMENT========")
+    logger.log("========CORA EXPERIMENT========")
 
     # download dataset using ogb pytorch geometric loader.
-    data = load_bitcoin_graph()
+    dataset = Planetoid("dataset", "Cora")
 
+    # arxiv specific
+    num_classes = dataset.num_classes
+    data = dataset[0]
     # boundaries[i-1] < input[x] <= boundaries[i]
-    degree_bins = torch.tensor([0, 5, 10, 20])
+    degree_bins = torch.tensor([0, 1, 5, 10])
     model_args = {
         "use_sampling": False,
-        "num_layers": 3,
+        "num_layers": 2,
         "hidden_dim": 256,
         "lr": 0.01,  # learning rate
         "epochs": 100,
-        "num_classes": data.num_classes,
+        "num_classes": num_classes,
         "num_features": data.num_features,
     }
 
-    logger.log("Config\n\ttimesteps: {}\n\tdegree_bins: {}\n\tmodel_args: {}\n\toutput_dir: {}".format(degree_bins, model_args, output_dir))
+    logger.log("Config\n\tdegree_bins: {}\n\tmodel_args: {}\n\toutput_dir: {}".format(degree_bins, model_args, output_dir))
     
-    run_static_experiment(data, data.num_classes, degree_bins, model_args, output_dir)
+    run_static_experiment(data, num_classes, degree_bins, model_args, output_dir)
 
 
 # run experiments
-run_bitcoin()
+run_arxiv()

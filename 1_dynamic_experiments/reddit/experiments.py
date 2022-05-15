@@ -191,6 +191,9 @@ def run_train_once(data, num_classes, timesteps, degree_bins, model_args, split_
 
             icp_evaluator.capture(model, icp, graph)
 
+            del y_hat
+            del y_true
+
             # ICP with resampling
             logger.log("running ICP with resampling")
 
