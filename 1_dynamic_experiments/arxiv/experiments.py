@@ -411,10 +411,8 @@ def run_arxiv():
     logger.log("Config\n\ttimesteps: {}\n\tdegree_bins: {}\n\tmodel_args: {}\n\toutput_dir: {}".format(
         timesteps, degree_bins, model_args, output_dir))
 
-    run_train_once(data, num_classes, timesteps, degree_bins,
-                   model_args, split_arxiv_graph, output_dir)
-    run_train_every_timestep(
-        data, num_classes, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
+    run_train_once(data, num_classes, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
+    # run_train_every_timestep(data, num_classes, timesteps, degree_bins, model_args, split_arxiv_graph, output_dir)
 
 
 # run experiments
