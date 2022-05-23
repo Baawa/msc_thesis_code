@@ -21,22 +21,33 @@ class CPEvaluator(object):
     self.avg_prediction_set_sizes = []
     self.frac_singleton_preds = []
     self.frac_empty_preds = []
+    self.batch_prediction_times = []
     self.prediction_times = []
+    self.batch_units = []
+    self.units = []
   
   def new_batch(self):
     self.coverages.append(self.batch_coverages)
     self.avg_prediction_set_sizes.append(self.batch_avg_prediction_set_sizes)
     self.frac_singleton_preds.append(self.batch_frac_singleton_preds)
     self.frac_empty_preds.append(self.batch_frac_empty_preds)
+    self.prediction_times.append(self.batch_prediction_times)
+    self.units.append(self.batch_units)
     self.batch_coverages = []
     self.batch_avg_prediction_set_sizes = []
     self.batch_frac_singleton_preds = []
     self.batch_frac_empty_preds = []
+    self.batch_prediction_times = []
+    self.batch_units = []
   
   def save_results(self):
-    time_avg = np.mean(self.prediction_times)
-    time_std = np.std(self.prediction_times)
-    self._save_results("results_{}_time.txt".format(self.title), tabulate([[time_avg, time_std]], headers=["avg","std"], tablefmt="tsv"))
+    prediction_time_avg = ["prediction_time avg"]
+    prediction_time_avg.extend(np.mean(np.array(self.prediction_times), axis=0).tolist())
+    self._save_results("results_{}_time.txt".format(self.title), tabulate([prediction_time_avg], headers=self.timesteps, tablefmt="tsv"))
+    
+    unit_avg = ["unit avg"]
+    unit_avg.extend(np.mean(np.array(self.units), axis=0).tolist())
+    self._save_results("results_{}_units.txt".format(self.title), tabulate([unit_avg], headers=self.timesteps, tablefmt="tsv"))
 
     coverage_avg = ["coverage avg"]
     coverage_avg.extend(np.mean(np.array(self.coverages), axis=0).tolist())
@@ -82,7 +93,8 @@ class ICPEvaluator(CPEvaluator):
     
     num_predictions = y_hat[y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-    self.prediction_times.append(prediction_time)
+    self.batch_prediction_times.append(prediction_time)
+    self.units.append(num_predictions)
 
     coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[y_true != -1])
 
@@ -114,7 +126,8 @@ class ICPWithResamplingEvaluator(CPEvaluator):
 
     num_predictions = test_y_hat[test_y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-    self.prediction_times.append(prediction_time)
+    self.batch_prediction_times.append(prediction_time)
+    self.units.append(num_predictions)
 
     coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, test_y_true[test_y_true != -1])
 
@@ -137,7 +150,8 @@ class MCPEvaluator(CPEvaluator):
 
     num_predictions = y_hat[y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-    self.prediction_times.append(prediction_time)
+    self.batch_prediction_times.append(prediction_time)
+    self.units.append(num_predictions)
 
     coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[y_true != -1])
 
@@ -185,7 +199,8 @@ class NodeDegreeMCPEvaluator(CPEvaluator):
 
       num_predictions = y_hat[degree_mask].shape[0]
       prediction_time = get_elapsed_time_per_unit(start_time, num_predictions) + model_prediction_time
-      self.prediction_times.append(prediction_time)
+      self.batch_prediction_times.append(prediction_time)
+      self.units.append(num_predictions)
 
       coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[degree_mask])
 
@@ -223,7 +238,8 @@ class NodeDegreeWeightedCPEvaluator(CPEvaluator):
 
     num_predictions = y_hat[y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-    self.prediction_times.append(prediction_time)
+    self.batch_prediction_times.append(prediction_time)
+    self.units.append(num_predictions)
 
     coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[y_true != -1])
 
@@ -250,7 +266,8 @@ class EmbeddingWeightedCPEvaluator(CPEvaluator):
 
     num_predictions = y_hat[y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
-    self.prediction_times.append(prediction_time)
+    self.batch_prediction_times.append(prediction_time)
+    self.units.append(num_predictions)
 
     coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[y_true != -1])
 
