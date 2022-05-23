@@ -31,7 +31,7 @@ class CPEvaluator(object):
     self.avg_prediction_set_sizes.append(self.batch_avg_prediction_set_sizes)
     self.frac_singleton_preds.append(self.batch_frac_singleton_preds)
     self.frac_empty_preds.append(self.batch_frac_empty_preds)
-    self.prediction_times.append(np.mean(self.batch_prediction_times))
+    self.prediction_times.append(self.batch_prediction_times)
     self.units.append(self.batch_units)
     self.batch_coverages = []
     self.batch_avg_prediction_set_sizes = []
@@ -43,8 +43,13 @@ class CPEvaluator(object):
   def save_results(self):
     # time_avg = np.mean(self.prediction_times)
     # time_std = np.std(self.prediction_times)
-    self._save_results("results_{}_time.txt".format(self.title), tabulate([self.prediction_times], headers=self.timesteps, tablefmt="tsv"))
-    self._save_results("results_{}_units.txt".format(self.title), tabulate([self.units], headers=self.timesteps, tablefmt="tsv"))
+    prediction_time_avg = ["prediction_time avg"]
+    prediction_time_avg.extend(np.mean(np.array(self.prediction_times), axis=0).tolist())
+    self._save_results("results_{}_time.txt".format(self.title), tabulate([prediction_time_avg], headers=self.timesteps, tablefmt="tsv"))
+    
+    unit_avg = ["unit avg"]
+    unit_avg.extend(np.mean(np.array(self.units), axis=0).tolist())
+    self._save_results("results_{}_units.txt".format(self.title), tabulate([unit_avg], headers=self.timesteps, tablefmt="tsv"))
 
     coverage_avg = ["coverage avg"]
     coverage_avg.extend(np.mean(np.array(self.coverages), axis=0).tolist())

@@ -400,10 +400,10 @@ def run_arxiv():
     degree_bins = torch.tensor([0, 5, 10, 20])
     model_args = {
         "use_sampling": False,
-        "num_layers": 3,
+        "num_layers": 2,
         "hidden_dim": 256,
         "lr": 0.01,  # learning rate
-        "epochs": 200,
+        "epochs": 300,
         "num_classes": num_classes,
         "num_features": data.num_features,
     }
