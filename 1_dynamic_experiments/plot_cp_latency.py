@@ -11,65 +11,47 @@ font = {'size': 20}
 matplotlib.rc('font', **font)
 alpha = 1
 
-# conventional
-icp = 0.00188
-icp_retrain = 0.00311
+data_icp = np.genfromtxt("results_icp_time.txt", delimiter="\t")
+data_icp_resampling = np.genfromtxt("results_icp_with_resampling_time.txt", delimiter="\t")
+data_mcp = np.genfromtxt("results_mcp_time.txt", delimiter="\t")
+data_mcp_nd = np.genfromtxt("results_node_degree_mcp_time.txt", delimiter="\t")
+data_ndw = np.genfromtxt("results_node_degree_weighted_cp_time.txt", delimiter="\t")
+data_ew = np.genfromtxt("results_embedding_weighted_cp_time.txt", delimiter="\t")
 
-icp_resampling = 0.00311
-icp_resampling_retrain = 0.00312
+time_steps = data_icp[0,1:].astype(int)
 
-mcp = 0.00167
-mcp_retrain = 0.00211
+def plot(index, title, ylabel, ymin=0, ymax=1):
+  # conventional
+  icp = data_icp[index, 1:] * 1000
+  icp_resampling = data_icp_resampling[index, 1:] * 1000
+  mcp = data_mcp[index, 1:] * 1000
 
-# novel
-mcp_nd = 0.00171
-mcp_nd_retrain = 0.00237
+  # novel
+  mcp_nd = data_mcp_nd[index, 1:] * 1000
+  ndw = data_ndw[index, 1:] * 1000
+  ew = data_ew[index, 1:] * 1000
 
-ndw = 0.00255
-ndw_retrain = 0.00415
+  X = np.arange(len(time_steps))
 
-ew = 0.00327
-ew_retrain = 0.00496
+  markers = itertools.cycle(['o', 'v', '^', 'X', 's', 'p', 'D'])
+  colors = itertools.cycle(['#e6194B', '#f58231', '#ffe119', '#3cb44b', '#e303fc', '#4363d8'])
 
-models = ["ICP", "ICP-r", "CCCP", "NCCP", "NWCP", "EWCP"]
+  plt.plot(X, icp, label='ICP', marker=next(markers), color=next(colors), ls="-")
+  plt.plot(X, icp_resampling, label='ICP-r', marker=next(markers), color=next(colors), ls="-")
+  plt.plot(X, mcp, label='CCCP', marker=next(markers), color=next(colors), ls="-")
 
-def plot(title, ymin=0, ymax=1):
-  X = np.arange(len(models))
-  bar_width = 0.33
+  plt.plot(X, mcp_nd, label='NCCP', marker=next(markers), color=next(colors), ls="-")
+  plt.plot(X, ndw, label='NWCP', marker=next(markers), color=next(colors), ls="-")
+  plt.plot(X, ew, label='EWCP', marker=next(markers), color=next(colors), ls="-")
 
-  hatch1 = "/"
-  hatch2 = "+"
-  red = "#e6194B"
-  blue = "#4363d8"
-  hatches = itertools.cycle(['/', '+', '//', '-', 'x', '\\', '*', 'o', '.'])
-
-  plt.bar(0, icp * 1000, width=bar_width, label='ICP', edgecolor='black', color=blue, hatch=next(hatches))
-  plt.bar(0 + bar_width, icp_retrain * 1000, width=bar_width, label='ICP with retraining', edgecolor='black', color=red, hatch=next(hatches))
-
-  plt.bar(1, icp_resampling * 1000, width=bar_width, label='ICP-r', edgecolor='black', color=blue, hatch=next(hatches))
-  plt.bar(1 + bar_width, icp_resampling_retrain * 1000, width=bar_width, label='ICP-r with retraining', edgecolor='black', color=red, hatch=next(hatches))
-  
-  plt.bar(2, mcp * 1000, width=bar_width, label='CCCP', edgecolor='black', color=blue, hatch=next(hatches))
-  plt.bar(2 + bar_width, mcp_retrain * 1000, width=bar_width, label='CCCP with retraining', edgecolor='black', color=red, hatch=next(hatches))
-
-  plt.bar(3, mcp_nd * 1000, width=bar_width, label='NCCP', edgecolor='black', color=blue, hatch=next(hatches))
-  plt.bar(3 + bar_width, mcp_nd_retrain * 1000, width=bar_width, label='NCCP with retraining', edgecolor='black', color=red, hatch=next(hatches))
-
-  plt.bar(4, ndw * 1000, width=bar_width, label='NWCP', edgecolor='black', color=blue, hatch=next(hatches))
-  plt.bar(4 + bar_width, ndw_retrain * 1000, width=bar_width, label='NWCP with retraining', edgecolor='black', color=red, hatch=next(hatches))
-
-  plt.bar(5, ew * 1000, width=bar_width, label='EWCP', edgecolor='black', color=blue, hatch=next(hatches))
-  plt.bar(5 + bar_width, ew_retrain * 1000, width=bar_width, label='EWCP with retraining', edgecolor='black', color=red, hatch=next(hatches))
-
-  plt.xticks(X + bar_width/2, models)
+  plt.xticks(X, time_steps)
   plt.ylim(ymin=ymin, ymax=ymax)
   plt.legend(ncol=3)
   plt.title(title)
-  plt.xlabel("Model")
-  plt.ylabel("milliseconds")
+  plt.xlabel("Time step")
+  plt.ylabel(ylabel)
   plt.grid(True)
 
-  # plt.savefig(f"plots/{title}.png", bbox_inches='tight')
   plt.tight_layout()
   output_dir = "plots"
   os.makedirs(output_dir, exist_ok=True)
@@ -77,4 +59,4 @@ def plot(title, ymin=0, ymax=1):
   plt.close()
   # plt.show()
 
-plot("Average prediction latency per sample across time steps - OGB Arxiv", ymin=0, ymax=6)
+plot(1, "Prediction latency (ms) - Bitcoin Elliptic - Train once", "Latency", ymin=0, ymax=0.5)
