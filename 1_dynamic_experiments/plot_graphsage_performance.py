@@ -43,4 +43,4 @@ def plot(title, ymin=0, ymax=1):
   plt.close()
   # plt.show()
 
-plot("GraphSAGE accuracy - OGB Arxiv - Train every time step", ymin=0.5, ymax=0.85)
+plot("GraphSAGE accuracy - Bitcoin Elliptic - Train once", ymin=0, ymax=1.1)

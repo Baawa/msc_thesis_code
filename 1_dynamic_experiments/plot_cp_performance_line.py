@@ -34,7 +34,7 @@ def plot(index, title, ylabel, ymin=0, ymax=1):
   X = np.arange(len(time_steps))
 
   markers = itertools.cycle(['o', 'v', '^', 'X', 's', 'p', 'D'])
-  colors = itertools.cycle(['#e6194B', '#f58231', '#ffe119', '#3cb44b', '#43D8CF', '#4363d8'])
+  colors = itertools.cycle(['#e6194B', '#f58231', '#ffe119', '#3cb44b', '#e303fc', '#4363d8'])
 
   plt.plot(X, icp, label='ICP', marker=next(markers), color=next(colors), ls="-")
   plt.plot(X, icp_resampling, label='ICP-r', marker=next(markers), color=next(colors), ls="-")
@@ -59,7 +59,7 @@ def plot(index, title, ylabel, ymin=0, ymax=1):
   plt.close()
   # plt.show()
 
-plot(1, "Coverage - OGB Arxiv - Train every time step", "Coverage", ymin=0.85, ymax=1)
-plot(3, "Average Prediction Set Size - OGB Arxiv - Train every time step", "Average prediction set size", ymin=1, ymax=7)
-plot(5, "Singleton Predictions - OGB Arxiv - Train every time step", "Fraction of singleton predictions", ymin=0, ymax=0.6)
-plot(6, "Empty Predictions - OGB Arxiv - Train every time step", "Fraction of empty predictions", ymin=0, ymax=0.04)
+plot(1, "Coverage - Bitcoin Elliptic - Train once", "Coverage", ymin=0, ymax=1)
+plot(3, "Average Prediction Set Size - Bitcoin Elliptic - Train once", "Average prediction set size", ymin=0, ymax=2)
+plot(5, "Singleton Predictions - Bitcoin Elliptic - Train once", "Fraction of singleton predictions", ymin=0, ymax=1.1)
+plot(6, "Empty Predictions - Bitcoin Elliptic - Train once", "Fraction of empty predictions", ymin=0, ymax=0.5)
