@@ -21,7 +21,7 @@ os.system('Xvfb :1 -screen 0 1600x1200x16  &')
 os.environ['DISPLAY'] = ':1.0'
 
 
-NUM_EXPERIMENTS = 5
+NUM_EXPERIMENTS = 20
 CONFIDENCE_LEVEL = 0.95
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
