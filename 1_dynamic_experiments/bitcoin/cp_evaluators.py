@@ -234,7 +234,7 @@ class NodeDegreeWeightedCPEvaluator(CPEvaluator):
     node_degrees = torch.zeros(graph.data.x.shape[0]).long().cpu()
     node_degrees[node_ids] = some_node_degrees.cpu()
 
-    confidence_intervals = get_confidence_intervals_node_degree_weighted(cp, y_hat[y_true != -1], node_degrees.cpu(), self.confidence_level)
+    confidence_intervals = get_confidence_intervals_node_degree_weighted(cp, y_hat[y_true != -1], node_degrees[y_true != -1].cpu(), self.confidence_level)
 
     num_predictions = y_hat[y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
@@ -262,7 +262,7 @@ class EmbeddingWeightedCPEvaluator(CPEvaluator):
     y_true = graph.data.y[test_indices].reshape(-1).detach().cpu()
     embeddings = embeddings[test_indices].cpu()
 
-    confidence_intervals = get_confidence_intervals_embedding_weighted(cp, y_hat[y_true != -1], embeddings, self.confidence_level)
+    confidence_intervals = get_confidence_intervals_embedding_weighted(cp, y_hat[y_true != -1], embeddings[y_true != -1], self.confidence_level)
 
     num_predictions = y_hat[y_true != -1].shape[0]
     prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
