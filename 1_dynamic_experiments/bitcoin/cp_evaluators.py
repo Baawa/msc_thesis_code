@@ -45,9 +45,9 @@ class CPEvaluator(object):
     prediction_time_avg.extend(np.mean(np.array(self.prediction_times), axis=0).tolist())
     self._save_results("results_{}_time.txt".format(self.title), tabulate([prediction_time_avg], headers=self.timesteps, tablefmt="tsv"))
     
-    unit_avg = ["unit avg"]
-    unit_avg.extend(np.mean(np.array(self.units), axis=0).tolist())
-    self._save_results("results_{}_units.txt".format(self.title), tabulate([unit_avg], headers=self.timesteps, tablefmt="tsv"))
+    # unit_avg = ["unit avg"]
+    # unit_avg.extend(np.mean(np.array(self.units), axis=0).tolist())
+    # self._save_results("results_{}_units.txt".format(self.title), tabulate([unit_avg], headers=self.timesteps, tablefmt="tsv"))
 
     coverage_avg = ["coverage avg"]
     coverage_avg.extend(np.mean(np.array(self.coverages), axis=0).tolist())
