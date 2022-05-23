@@ -180,6 +180,7 @@ class NodeDegreeMCPEvaluator(CPEvaluator):
     num_predictions = y_hat.shape[0]
     model_prediction_time = get_elapsed_time_per_unit(start_time, num_predictions)
 
+    _prediction_times = []
     _coverages = []
     _avg_prediction_set_sizes = []
     _frac_singleton_preds = []
@@ -195,8 +196,8 @@ class NodeDegreeMCPEvaluator(CPEvaluator):
 
       num_predictions = y_hat[degree_mask].shape[0]
       prediction_time = get_elapsed_time_per_unit(start_time, num_predictions) + model_prediction_time
-      self.batch_prediction_times.append(prediction_time)
       self.units.append(num_predictions)
+      _prediction_times.append(prediction_time)
 
       coverage, avg_prediction_set_size, frac_singleton_pred, frac_empty_pred = get_coverage_and_efficiency(confidence_intervals, y_true[degree_mask])
 
@@ -209,6 +210,7 @@ class NodeDegreeMCPEvaluator(CPEvaluator):
     dataset_size = torch.sum(torch.tensor(_samples_per_bin))
     
     # average 
+    self.batch_prediction_times.append(get_measure_averaged_on_bins(_prediction_times, _samples_per_bin, dataset_size))
     self.batch_coverages.append(get_measure_averaged_on_bins(_coverages, _samples_per_bin, dataset_size))
     self.batch_avg_prediction_set_sizes.append(get_measure_averaged_on_bins(_avg_prediction_set_sizes, _samples_per_bin, dataset_size))
     self.batch_frac_singleton_preds.append(get_measure_averaged_on_bins(_frac_singleton_preds, _samples_per_bin, dataset_size))
