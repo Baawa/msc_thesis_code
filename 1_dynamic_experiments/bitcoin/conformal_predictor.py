@@ -80,7 +80,7 @@ class MondrianConformalClassifier():
 
         return
 
-    def predict(self, alphas, max_y_proba, confidence_level):
+    def predict(self, alphas, confidence_level):
         """
         Retrieve a prediction region for the provided nonconformity measures 
         \nOBS! Only single samples allowed
@@ -93,13 +93,12 @@ class MondrianConformalClassifier():
 
         classes = torch.unique(self.y)
 
-        _alphas = self.alphas[self.y == max_y_proba]
 
         for y in classes:
             ai = alphas[y]
 
             # non-conformity scores
-            a = _alphas
+            a = self.alphas[self.y == y]
 
             # calculate p-score
             c = torch.count_nonzero(a >= ai)

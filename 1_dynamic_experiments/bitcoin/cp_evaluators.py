@@ -279,8 +279,7 @@ def get_confidence_intervals_mcp(cp, y_hat, confidence_level=0.95):
   confidence_intervals = []
   for y_probas in y_hat:
     alphas = get_nonconformity_measure_for_classification(y_probas)
-    max_y = y_probas.argmax(dim=-1, keepdim=True)
-    ci = cp.predict(alphas, max_y, confidence_level)
+    ci = cp.predict(alphas, confidence_level)
     confidence_intervals.append(ci)
   
   return confidence_intervals
