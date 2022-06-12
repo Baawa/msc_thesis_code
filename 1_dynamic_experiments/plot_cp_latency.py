@@ -7,7 +7,7 @@ import itertools
 matplotlib.rcParams['lines.linewidth'] = 4
 matplotlib.rcParams['lines.markersize'] = 14
 matplotlib.rcParams['figure.figsize'] = [30, 12]
-font = {'size': 20}
+font = {'size': 32}
 matplotlib.rc('font', **font)
 alpha = 1
 
@@ -44,7 +44,8 @@ def plot(index, title, ylabel, ymin=0, ymax=1):
   plt.plot(X, ndw, label='NWCP', marker=next(markers), color=next(colors), ls="-")
   plt.plot(X, ew, label='EWCP', marker=next(markers), color=next(colors), ls="-")
 
-  plt.xticks(X, time_steps)
+  # plt.xticks(X, time_steps)
+  plt.xticks(np.arange(0, len(time_steps), step=5))
   plt.ylim(ymin=ymin, ymax=ymax)
   plt.legend(ncol=3)
   plt.title(title)
@@ -55,8 +56,8 @@ def plot(index, title, ylabel, ymin=0, ymax=1):
   plt.tight_layout()
   output_dir = "plots"
   os.makedirs(output_dir, exist_ok=True)
-  plt.savefig(f"{output_dir}/{title}.png")
+  plt.savefig(f"{output_dir}/{title} - Train once.png")
   plt.close()
   # plt.show()
 
-plot(1, "Prediction latency (ms) - Bitcoin Elliptic - Train once", "Latency", ymin=0, ymax=0.5)
+plot(1, "Prediction latency (ms) - Bitcoin Elliptic", "Latency", ymin=0, ymax=0.5)
