@@ -397,6 +397,7 @@ class EmbeddingWeightedCPWithResamplingEvaluator(CPEvaluator):
     y_hat, embeddings = model.predict(graph.data)
     model.set_return_embeds(False)
     y_hat = y_hat.detach().cpu()
+    embeddings = embeddings.cpu()
     y_true = graph.data.y.reshape(-1).detach().cpu()
 
     cp = create_embedding_weighted_cp(y_hat[calibration_indices], y_true[calibration_indices], embeddings[calibration_indices])
