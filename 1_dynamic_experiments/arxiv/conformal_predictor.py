@@ -246,10 +246,6 @@ class EmbeddingDistanceWeightedConformalClassifier():
     prediction_region = []
 
     classes = torch.unique(self.y)
-    
-    # weights
-    # node_embedding_2d = torch.reshape(node_embedding, (1, node_embedding.shape[0]))
-    # embedding_distance = torch.cdist(self.node_embeddings, node_embedding_2d)
 
     # euclidean ditance without sqrt for faster calculations
     embedding_distance = torch.sum((self.node_embeddings-node_embedding)**2, dim=1)
@@ -257,10 +253,8 @@ class EmbeddingDistanceWeightedConformalClassifier():
     max_distance = torch.max(embedding_distance)
     normalized_distance = embedding_distance / max_distance
     
-    weights = 1 - normalized_distance
-    sum_weights = torch.sum(weights) + 1
-    cal_normalized_weights = weights / sum_weights
-    sample_normalized_weight = 1 / sum_weights
+    cal_normalized_weights = 1 - normalized_distance
+    sample_normalized_weight = 1 # there is no distance between the node and itself
 
     for y in classes:
       ai = alphas[y] * sample_normalized_weight
