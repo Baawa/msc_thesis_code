@@ -250,7 +250,7 @@ class NodeDegreeMCPWithResamplingEvaluator(CPEvaluator):
 
     node_degrees_bins = get_node_degrees_bins(graph.data, calibration_indices, bins)
 
-    cp = create_node_degree_mcp(y_hat, y_true, node_degrees_bins)
+    cp = create_node_degree_mcp(y_hat[calibration_indices], y_true[calibration_indices], node_degrees_bins)
 
     y_hat = y_hat[test_indices]
     y_true = y_true[test_indices]
