@@ -261,7 +261,7 @@ class EmbeddingDistanceWeightedConformalClassifier():
       
       # calculate p-score
       c = torch.count_nonzero(a >= ai)
-      p_score = c / len(a)
+      p_score = c / torch.count_nonzero(a).detach().cpu().numpy()
 
       if p_score > significance_level:
         prediction_region.append(y)
