@@ -104,7 +104,7 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
     mcp_evaluator = MCPEvaluator("mcp", [1], output_dir, CONFIDENCE_LEVEL)
     nd_mcp_evaluator = NodeDegreeMCPEvaluator("node_degree_mcp", [1], output_dir, CONFIDENCE_LEVEL)
     nd_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("node_degree_weighted_cp", [1], output_dir, CONFIDENCE_LEVEL)
-    embedding_weighted_cp_evaluator = NodeDegreeWeightedCPEvaluator("embedding_weighted_cp", [1], output_dir, CONFIDENCE_LEVEL)
+    embedding_weighted_cp_evaluator = EmbeddingWeightedCPEvaluator("embedding_weighted_cp", [1], output_dir, CONFIDENCE_LEVEL)
 
     for experiment_num in range(NUM_EXPERIMENTS):
         logger.log("Experiment {} started".format(experiment_num))
