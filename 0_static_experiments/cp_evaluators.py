@@ -213,6 +213,8 @@ class NodeDegreeWeightedCPEvaluator(CPEvaluator):
     node_degrees = torch.zeros(graph.data.x.shape[0]).long().cpu()
     node_degrees[node_ids] = some_node_degrees.cpu()
 
+    node_degrees = node_degrees[test_indices]
+
     confidence_intervals = get_confidence_intervals_node_degree_weighted(cp, y_hat, node_degrees.cpu(), self.confidence_level)
 
     num_predictions = y_hat.shape[0]
