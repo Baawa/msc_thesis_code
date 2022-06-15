@@ -112,9 +112,7 @@ def run_static_experiment(data, num_classes, degree_bins, model_args, output_dir
         # split data set
         _, calibration_indices, test_indices = split_dataset(data.cpu(), test_frac=0.2, calibration_frac=0.2)
 
-        print(f"data is cuda: {data.is_cuda}")
         graph = Graph(1, data.to(DEVICE), train_data, calibration_indices, test_indices)
-        print(f"data is cuda (2): {data.is_cuda}")
         
         # capture model performance
         model_evaluator.capture(model, graph)
