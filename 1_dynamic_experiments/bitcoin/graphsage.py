@@ -128,9 +128,9 @@ class GraphSAGE(torch.nn.Module):
       embedding = torch.nn.functional.dropout(embedding, p=self.dropout, training=self.training)
     
     # output layer
-    embedding = self.convs[-1](x=embedding, edge_index=adj_t)
+    class_embedding = self.convs[-1](x=embedding, edge_index=adj_t)
 
-    node_class = self.softmax(embedding)
+    node_class = self.softmax(class_embedding)
 
     if self.return_embeds:
       return node_class, embedding
