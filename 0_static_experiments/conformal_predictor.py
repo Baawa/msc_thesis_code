@@ -249,12 +249,9 @@ class EmbeddingDistanceWeightedConformalClassifier():
     
     # euclidean ditance without sqrt for faster calculations
     embedding_distance = torch.sum((self.node_embeddings-node_embedding)**2, dim=1)
-
-    max_distance = torch.max(embedding_distance)
-    normalized_distance = embedding_distance / max_distance
     
-    cal_normalized_weights = 1 - normalized_distance
-    sample_normalized_weight = 1
+    cal_normalized_weights = torch.where(embedding_distance < 300, 1, 0)
+    sample_normalized_weight = 1 # there is no distance between the node and itself
 
     for y in classes:
       ai = alphas[y] * sample_normalized_weight
