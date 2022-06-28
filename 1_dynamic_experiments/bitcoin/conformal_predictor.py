@@ -195,8 +195,7 @@ class NodeDegreeWeightedConformalClassifier():
     degree_diff = node_degree - self.node_degrees
     max_diff = torch.max(degree_diff)
     norm_diff = degree_diff / max_diff
-    # weights = 1 - norm_diff
-    weights = norm_diff
+    weights = 1 - norm_diff
 
     for y in classes:
       ai = alphas[y]
