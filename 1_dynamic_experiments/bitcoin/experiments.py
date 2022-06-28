@@ -37,7 +37,7 @@ def split_bitcoin_graph(data, timesteps):
     graphs = []
 
     for ts in time_steps:
-        indices = torch.nonzero(torch.where(data.time_steps == ts, 1, 0))[
+        indices = torch.nonzero(torch.where(data.time_steps <= ts, 1, 0))[
             :, 0].tolist()
 
         ts_data = split(data, indices)
