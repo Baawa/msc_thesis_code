@@ -24,7 +24,8 @@ def plot(title, ymin=0, ymax=1):
   plt.plot(X, accuracies, label='Accuracy', marker="v", color="#4363d8", ls="-")
   plt.plot(X, macro_f1, label='Macro F1', marker="o", color="#e6194B", ls="-")
   
-  plt.xticks(np.arange(0, len(time_steps), step=5))
+  #plt.xticks(np.arange(0, len(time_steps), step=5))
+  plt.xticks(X, time_steps)
   # plt.yscale('log')
   # plt.ylim(ymax=10000)
   plt.ylim(ymin=ymin, ymax=ymax)
@@ -39,8 +40,8 @@ def plot(title, ymin=0, ymax=1):
   plt.tight_layout()
   output_dir = "plots"
   os.makedirs(output_dir, exist_ok=True)
-  plt.savefig(f"{output_dir}/{title} - Train once.png")
+  plt.savefig(f"{output_dir}/{title}.png")
   plt.close()
   # plt.show()
 
-plot("GraphSAGE accuracy - Bitcoin Elliptic", ymin=0.1, ymax=1.1)
+plot("GraphSAGE accuracy - OGB Arxiv", ymin=0.1, ymax=0.9)
