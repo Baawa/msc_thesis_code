@@ -192,19 +192,17 @@ class NodeDegreeWeightedConformalClassifier():
     classes = torch.unique(self.y)
     
     # weights
-    max_degree = torch.max(torch.cat((self.node_degrees, torch.tensor([node_degree]))))
-    normalized_degrees = self.node_degrees / max_degree
-    weights = 1 - torch.abs((node_degree/max_degree) - normalized_degrees)
-    sum_weights = torch.sum(weights) + 1
-    
-    cal_normalized_weights = weights / sum_weights
-    sample_normalized_weight = 1 / sum_weights
+    degree_diff = node_degree - self.node_degrees
+    max_diff = torch.max(degree_diff)
+    norm_diff = degree_diff / max_diff
+    # weights = 1 - norm_diff
+    weights = norm_diff
 
     for y in classes:
-      ai = alphas[y] * sample_normalized_weight
+      ai = alphas[y]
 
       # non-conformity scores
-      a = self.alphas * cal_normalized_weights
+      a = self.alphas * weights
       
       # calculate p-score
       c = torch.count_nonzero(a >= ai)
